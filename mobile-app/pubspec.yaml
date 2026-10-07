@@ -1,0 +1,56 @@
+name: tkbj_mobile
+description: "Aplikasi mobile pengunjung Taman Krida Budaya Jawa Timur (prototipe UTS)."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_svg: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/icons/
+    - assets/images/
+
+  fonts:
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+        - asset: assets/fonts/Poppins-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Poppins-ExtraBold.ttf
+          weight: 800
+    - family: PlayfairDisplay
+      fonts:
+        - asset: assets/fonts/PlayfairDisplay-600.ttf
+          weight: 600
+        - asset: assets/fonts/PlayfairDisplay-700.ttf
+          weight: 700
+        - asset: assets/fonts/PlayfairDisplay-800.ttf
+          weight: 800
+    # Subset Noto Sans Math & Noto Sans Symbols 2 (OFL) untuk simbol
+    # dekoratif desain (◆ ◇ ✦ ✓ → …) yang tidak ada di Poppins.
+    - family: TkbjSymbolsMath
+      fonts:
+        - asset: assets/fonts/TkbjSymbolsMath.ttf
+    - family: TkbjSymbols2
+      fonts:
+        - asset: assets/fonts/TkbjSymbols2.ttf
