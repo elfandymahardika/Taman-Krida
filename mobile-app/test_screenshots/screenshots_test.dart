@@ -29,7 +29,8 @@ Future<void> _precacheImages(WidgetTester tester) async {
   await tester.runAsync(() async {
     for (final element in find.byType(Image).evaluate()) {
       final image = element.widget as Image;
-      await precacheImage(image.image, element);
+      // Foto yang belum diekspor dari Figma memakai sampul gradien.
+      await precacheImage(image.image, element, onError: (_, _) {});
     }
     // Beri waktu flutter_svg memuat & mem-parse aset SVG.
     await Future<void>.delayed(const Duration(milliseconds: 300));

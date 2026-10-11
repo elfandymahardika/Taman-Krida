@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/utils/formatters.dart';
 import '../../core/utils/validators.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
@@ -25,6 +26,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _emailController;
   late final TextEditingController _phoneController;
+  late final TextEditingController _cityController;
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController = TextEditingController();
     _emailController = TextEditingController();
     _phoneController = TextEditingController();
+    _cityController = TextEditingController();
   }
 
   @override
@@ -42,6 +45,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       _nameController.text = user.name;
       _emailController.text = user.email;
       _phoneController.text = user.phone;
+      _cityController.text = user.city;
     }
   }
 
@@ -50,6 +54,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _cityController.dispose();
     super.dispose();
   }
 
@@ -59,6 +64,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       name: _nameController.text,
       email: _emailController.text,
       phone: _phoneController.text,
+      city: _cityController.text,
     );
     if (error != null) {
       showAppToast(context, error);
@@ -75,7 +81,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         PageHeader(
           breadcrumb: 'Akun Saya / Edit Profil',
           title: 'Edit Profil',
-          subtitle: 'Perbarui data diri untuk pemesanan tiket dan sewa.',
+          subtitle:
+              'Perbarui data diri yang dipakai untuk tiket dan pengajuan sewa.',
           onBreadcrumbTap: () => Navigator.of(context).pop(),
         ),
         ContentSection(
@@ -84,10 +91,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text(
-                  'Data Diri',
-                  style: AppText.playfair(20, color: AppColors.maroon),
-                ),
+                _AvatarEditor(name: _nameController.text),
                 const SizedBox(height: 16),
                 LabeledTextField(
                   label: 'Nama Lengkap',
@@ -104,14 +108,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
                 const SizedBox(height: 14),
                 LabeledTextField(
-                  label: 'No. Telepon / WhatsApp',
+                  label: 'No. WhatsApp',
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
-                  textInputAction: TextInputAction.done,
                   inputFormatters: [
                     FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
                   ],
                   validator: Validators.phone,
+                ),
+                const SizedBox(height: 14),
+                LabeledTextField(
+                  label: 'Kota',
+                  controller: _cityController,
+                  hint: 'Contoh: Malang',
+                  textInputAction: TextInputAction.done,
+                  validator: (v) => Validators.required(v, 'Kota'),
                 ),
                 const SizedBox(height: 20),
                 AppButton(label: 'Simpan Perubahan', onPressed: _save),
@@ -123,6 +134,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _AvatarEditor extends StatelessWidget {
+  const _AvatarEditor({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 72,
+          height: 72,
+          alignment: Alignment.center,
+          decoration: const BoxDecoration(
+            color: AppColors.maroon,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            Formatters.initials(name),
+            style: AppText.playfair(22, color: AppColors.white),
+          ),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton(
+          onPressed: () => showAppToast(
+            context,
+            'Contoh prototype: pilih foto dari galeri.',
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.maroon,
+            side: const BorderSide(color: AppColors.border),
+            minimumSize: const Size(0, 32),
+            padding: const EdgeInsets.symmetric(horizontal: 13),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+            ),
+            textStyle: AppText.poppins(12, weight: FontWeight.w600),
+          ),
+          child: const Text('Ubah Foto'),
         ),
       ],
     );

@@ -26,7 +26,9 @@ class ResponsiveGrid extends StatelessWidget {
           1,
           maxColumns,
         );
-        final itemWidth = (width - spacing * (columns - 1)) / columns;
+        // Dikurangi sedikit agar pembulatan desimal tidak memindahkan kartu
+        // terakhir ke baris berikutnya.
+        final itemWidth = (width - spacing * (columns - 1)) / columns - 0.01;
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,

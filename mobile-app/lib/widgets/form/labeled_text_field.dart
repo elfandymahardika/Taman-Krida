@@ -18,6 +18,7 @@ class LabeledTextField extends StatelessWidget {
     this.autofillHints,
     this.suffix,
     this.onFieldSubmitted,
+    this.maxLines = 1,
   });
 
   final String label;
@@ -32,6 +33,9 @@ class LabeledTextField extends StatelessWidget {
   final Widget? suffix;
   final ValueChanged<String>? onFieldSubmitted;
 
+  /// Lebih dari 1 untuk isian panjang seperti deskripsi.
+  final int maxLines;
+
   @override
   Widget build(BuildContext context) {
     return FieldLabel(
@@ -45,6 +49,8 @@ class LabeledTextField extends StatelessWidget {
         inputFormatters: inputFormatters,
         autofillHints: autofillHints,
         onFieldSubmitted: onFieldSubmitted,
+        maxLines: maxLines,
+        minLines: maxLines > 1 ? 3 : null,
         autovalidateMode: AutovalidateMode.onUserInteraction,
         style: AppText.poppins(13),
         decoration: InputDecoration(

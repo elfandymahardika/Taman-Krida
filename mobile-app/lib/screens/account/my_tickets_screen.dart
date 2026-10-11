@@ -15,7 +15,7 @@ import '../../widgets/layout/page_header.dart';
 import '../../widgets/layout/responsive_grid.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
 import '../checkout/widgets/e_ticket_card.dart';
-import 'widgets/segmented_tabs.dart';
+import '../../widgets/interactive/segmented_tabs.dart';
 
 /// Tiket saya: hasil input checkout (node 1:2928 "mobile-tiket-saya").
 class MyTicketsScreen extends StatefulWidget {
@@ -133,8 +133,8 @@ class _TicketCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
                 child: Image.asset(
                   event.imageAsset,
-                  width: 56,
-                  height: 56,
+                  width: 72,
+                  height: 72,
                   fit: BoxFit.cover,
                   cacheWidth: 170,
                 ),

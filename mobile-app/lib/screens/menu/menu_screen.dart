@@ -11,19 +11,12 @@ import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
 
 class _MenuEntry {
-  const _MenuEntry(
-    this.icon,
-    this.title,
-    this.subtitle,
-    this.route, [
-    this.args,
-  ]);
+  const _MenuEntry(this.icon, this.title, this.subtitle, this.route);
 
   final String icon;
   final String title;
   final String subtitle;
   final String route;
-  final Object? args;
 }
 
 /// Menu navigasi layar penuh (node 1:99 "mobile-menu-navigasi").
@@ -65,22 +58,19 @@ class MenuScreen extends StatelessWidget {
       AppIcons.images,
       'Virtual Galeri',
       'Jelajahi koleksi seni secara virtual',
-      AppRoutes.comingSoon,
-      'Virtual Galeri',
+      AppRoutes.gallery,
     ),
     _MenuEntry(
       AppIcons.users,
       'Direktori Komunitas',
       'Temukan sanggar dan komunitas seni',
-      AppRoutes.comingSoon,
-      'Direktori Komunitas',
+      AppRoutes.communities,
     ),
     _MenuEntry(
       AppIcons.map,
       'Edukasi Budaya',
       'Sejarah & filosofi kesenian tradisi',
-      AppRoutes.comingSoon,
-      'Edukasi Budaya',
+      AppRoutes.education,
     ),
     _MenuEntry(
       AppIcons.house,
@@ -96,7 +86,7 @@ class MenuScreen extends StatelessWidget {
       AppRoutes.goHome(context);
       return;
     }
-    navigator.pushReplacementNamed(entry.route, arguments: entry.args);
+    navigator.pushReplacementNamed(entry.route);
   }
 
   @override

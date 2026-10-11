@@ -12,6 +12,8 @@ class Facility {
     required this.imageAsset,
     required this.mapPosition,
     this.ratePerHour,
+    this.seatCount,
+    this.rentalCapacityLabel,
   });
 
   final String id;
@@ -27,6 +29,12 @@ class Facility {
 
   /// Tarif sewa per jam. `null` jika fasilitas tidak dapat disewa.
   final int? ratePerHour;
+
+  /// Jumlah kursi, mis. 500 (dipakai di ringkasan venue terpilih).
+  final int? seatCount;
+
+  /// Keterangan kapasitas pada kartu pilih venue.
+  final String? rentalCapacityLabel;
 
   bool get isRentable => ratePerHour != null;
 }

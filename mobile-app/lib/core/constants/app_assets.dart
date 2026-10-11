@@ -24,4 +24,11 @@ abstract final class AppImages {
   static const fasilitasPanggung = '$_dir/fasilitas-panggung.png';
   static const fasilitasGedung = '$_dir/fasilitas-gedung.png';
   static const fasilitasParkir = '$_dir/fasilitas-parkir.png';
+
+  // Foto berikut belum bisa diekspor dari Figma (batas akses MCP).
+  // Jika file belum ada, ArtworkImage menampilkan sampul gradien sebagai
+  // gantinya; cukup taruh file dengan nama ini untuk memakai foto asli.
+  static const gamelan = '$_dir/gamelan.png';
+  static const latihanSanggar = '$_dir/latihan-sanggar.png';
+  static const jaranan = '$_dir/jaranan.png';
 }

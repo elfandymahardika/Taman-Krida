@@ -8,14 +8,13 @@ import '../../routes/app_routes.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_card.dart';
-import '../../widgets/common/info_row.dart';
 import '../../widgets/common/pill_badge.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
 import '../../widgets/layout/responsive_grid.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
 
-/// Riwayat sewa gedung: menampilkan hasil input formulir sewa.
+/// Riwayat sewa gedung (node 157:3050 "mobile-riwayat-sewa").
 class RentalHistoryScreen extends StatelessWidget {
   const RentalHistoryScreen({super.key});
 
@@ -29,33 +28,34 @@ class RentalHistoryScreen extends StatelessWidget {
         PageHeader(
           breadcrumb: 'Akun Saya / Riwayat Sewa',
           title: 'Riwayat Sewa Gedung',
-          subtitle: 'Pantau status pengajuan sewa venue Anda.',
-          onBreadcrumbTap: () => navigator.pushNamedAndRemoveUntil(
-            AppRoutes.account,
-            (route) => route.isFirst,
-          ),
+          subtitle: 'Pantau status setiap pengajuan sewa venue Anda.',
+          onBreadcrumbTap: () =>
+              AppRoutes.openFromHome(context, AppRoutes.account),
         ),
         ContentSection(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ResponsiveGrid(
+                spacing: 16,
                 children: [
                   for (final rental in rentals) _RentalCard(rental: rental),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               AppButton(
                 label: '+ Ajukan Sewa Baru',
-                onPressed: () => navigator.pushNamed(AppRoutes.rental),
+                onPressed: () {
+                  AppStateScope.read(context).startRental();
+                  navigator.pushNamed(AppRoutes.rental);
+                },
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
               AppButton.outline(
                 label: '← Kembali ke Akun',
-                onPressed: () => navigator.pushNamedAndRemoveUntil(
-                  AppRoutes.account,
-                  (route) => route.isFirst,
-                ),
+                onPressed: () =>
+                    AppRoutes.openFromHome(context, AppRoutes.account),
               ),
             ],
           ),
@@ -72,8 +72,18 @@ class _RentalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final endHour = rental.startHour + rental.durationHours;
+    final (String action, String route) = switch (rental.status) {
+      RentalStatus.paid => ('Lihat Bukti Reservasi', AppRoutes.rentalReceipt),
+      RentalStatus.approved => ('Lanjut Bayar Sewa', AppRoutes.rentalPayment),
+      RentalStatus.pending => ('Lihat Status', AppRoutes.rentalStatus),
+      RentalStatus.rejected => (
+        'Lihat Catatan & Ajukan Ulang',
+        AppRoutes.rentalRejected,
+      ),
+    };
+
     return AppCard(
+      padding: const EdgeInsets.all(15),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -82,11 +92,7 @@ class _RentalCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   rental.code,
-                  style: AppText.poppins(
-                    12,
-                    weight: FontWeight.w600,
-                    color: AppColors.maroon,
-                  ),
+                  style: AppText.poppins(13, weight: FontWeight.w600),
                 ),
               ),
               PillBadge(
@@ -99,27 +105,21 @@ class _RentalCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Text(rental.activityName, style: AppText.playfair(16)),
-          const SizedBox(height: 10),
-          InfoRow(label: 'Venue', value: rental.facility.shortName),
-          const SizedBox(height: 6),
-          InfoRow(label: 'Tanggal', value: Formatters.longDate(rental.date)),
-          const SizedBox(height: 6),
-          InfoRow(
-            label: 'Waktu',
-            value:
-                '${Formatters.hour(rental.startHour)}–'
-                '${Formatters.hour(endHour)} (${rental.durationHours} jam)',
+          Text(
+            rental.facility.name,
+            style: AppText.poppins(14, weight: FontWeight.w600),
           ),
-          const SizedBox(height: 6),
-          InfoRow(label: 'Pengaju', value: rental.applicantName),
+          const SizedBox(height: 4),
+          Text(
+            '${Formatters.longDate(rental.date)} · ${rental.slot.shortLabel}',
+            style: AppText.poppins(11, color: AppColors.muted),
+          ),
           const SizedBox(height: 10),
-          const ThinDivider(),
-          const SizedBox(height: 10),
-          InfoRow(
-            label: 'Estimasi Biaya',
-            value: Formatters.rupiah(rental.estimatedCost),
-            valueStyle: AppText.playfair(16, color: AppColors.maroon),
+          AppButton.outline(
+            label: action,
+            fontSize: 13,
+            onPressed: () =>
+                Navigator.of(context).pushNamed(route, arguments: rental.code),
           ),
         ],
       ),

@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import '../../core/constants/app_assets.dart';
+import '../../core/utils/formatters.dart';
 import '../models/cultural_event.dart';
 import '../models/facility.dart';
 import '../models/rental_request.dart';
@@ -113,6 +114,8 @@ abstract final class DummyData {
       imageAsset: AppImages.fasilitasPendopo,
       mapPosition: Offset(0.198, 0.254),
       ratePerHour: 3500000,
+      seatCount: 500,
+      rentalCapacityLabel: 'Kapasitas up to 500 kursi pementasan',
     ),
     const Facility(
       id: 'panggung-terbuka',
@@ -125,7 +128,9 @@ abstract final class DummyData {
       capacityLabel: 'Kapasitas up to 800 orang',
       imageAsset: AppImages.fasilitasPanggung,
       mapPosition: Offset(0.534, 0.213),
-      ratePerHour: 4000000,
+      ratePerHour: 2500000,
+      seatCount: 800,
+      rentalCapacityLabel: 'Kapasitas up to 800 penonton',
     ),
     const Facility(
       id: 'gedung-kesenian',
@@ -138,7 +143,9 @@ abstract final class DummyData {
       capacityLabel: 'Kapasitas up to 200 orang',
       imageAsset: AppImages.fasilitasGedung,
       mapPosition: Offset(0.673, 0.629),
-      ratePerHour: 2000000,
+      ratePerHour: 1500000,
+      seatCount: 200,
+      rentalCapacityLabel: 'Kapasitas up to 200 pameran',
     ),
     const Facility(
       id: 'parkir-informasi',
@@ -154,24 +161,13 @@ abstract final class DummyData {
     ),
   ];
 
-  /// Tanggal yang sudah terpakai per venue (simulasi jadwal penuh).
-  static final bookedDates = <String, List<DateTime>>{
-    'pendopo-agung': [DateTime(2026, 10, 10), DateTime(2026, 10, 24)],
-    'panggung-terbuka': [DateTime(2026, 10, 17)],
-    'gedung-kesenian': [DateTime(2026, 10, 12), DateTime(2026, 10, 13)],
-  };
-
-  static const rentalStartHours = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
-
-  /// Gedung tutup pukul 22:00.
-  static const rentalClosingHour = 22;
-
   static const demoAccount = UserAccount(
     name: 'Budi Santoso',
     email: 'budi.santoso@email.com',
     phone: '081234567890',
     password: 'tkbj2026',
     memberSince: 2026,
+    city: 'Malang',
     savedEvents: 5,
   );
 
@@ -194,15 +190,62 @@ abstract final class DummyData {
 
   static List<RentalRequest> seedRentals() => [
     RentalRequest(
-      code: 'SG-1026-0018',
+      code: 'SG-1026-0020',
+      facility: facilities[2],
+      activityName: 'Pameran Kriya Muda Malang Raya',
+      date: DateTime(2026, 6, 20),
+      slot: RentalSlot.afternoon,
+      applicantName: 'Komunitas Ruang Seni',
+      contact: '0813-5566-7788',
+      documentCount: 3,
+      submittedAt: DateTime(2026, 6, 2, 10, 5),
+    ),
+    RentalRequest(
+      code: 'SG-1026-0019',
       facility: facilities[0],
       activityName: 'Festival Tari Topeng Malangan 2026',
       date: DateTime(2026, 6, 12),
-      startHour: 8,
-      durationHours: 4,
+      slot: RentalSlot.morning,
       applicantName: 'Yayasan Mekar Sari Malang',
       contact: '0812-3456-7890',
-      status: RentalStatus.approved,
+      documentCount: 3,
+      submittedAt: DateTime(2026, 6, 1, 14, 20),
+      status: RentalStatus.paid,
+      reviewedAt: DateTime(2026, 6, 2, 9, 12),
+      paymentMethod: PaymentMethod.virtualAccount,
     ),
+    RentalRequest(
+      code: 'SG-1026-0012',
+      facility: facilities[1],
+      activityName: 'Malam Apresiasi Jaranan',
+      date: DateTime(2026, 6, 5),
+      slot: RentalSlot.evening,
+      applicantName: "Jaranan Dor 'Turonggo Putro'",
+      contact: '0822-9988-7766',
+      documentCount: 2,
+      submittedAt: DateTime(2026, 5, 20, 16, 40),
+      status: RentalStatus.rejected,
+      reviewedAt: DateTime(2026, 5, 21, 9, 12),
+      adminNote: rejectionNote(DateTime(2026, 6, 5)),
+      fixes: rejectionFixes,
+    ),
+  ];
+
+  /// Catatan admin (simulasi) saat pengajuan sewa ditolak.
+  static String rejectionNote(DateTime date) =>
+      'Tanggal ${Formatters.longDate(date)} bentrok dengan agenda internal '
+      'Disbudpar Jatim. Mohon ajukan ulang dengan tanggal lain dan lengkapi '
+      'proposal dengan rundown acara.';
+
+  static const rejectionFixes = [
+    'Ganti tanggal pelaksanaan',
+    'Lampirkan rundown acara di proposal',
+  ];
+
+  /// Berkas wajib pada langkah Unggah Berkas sewa gedung.
+  static const rentalDocuments = [
+    'KTP Penanggung Jawab',
+    'Surat Permohonan Resmi',
+    'Proposal Kegiatan',
   ];
 }

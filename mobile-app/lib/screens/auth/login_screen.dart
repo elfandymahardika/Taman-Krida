@@ -13,6 +13,7 @@ import '../../widgets/form/labeled_text_field.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
 import 'widgets/auth_card.dart';
+import 'widgets/forgot_password_sheet.dart';
 import 'widgets/password_toggle.dart';
 
 /// Halaman masuk akun (node 1:215 "mobile-login").
@@ -126,9 +127,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => showAppToast(
+                          onTap: () => showForgotPasswordSheet(
                             context,
-                            'Tautan reset kata sandi terkirim ke email.',
+                            initialEmail: _emailController.text.trim(),
                           ),
                           child: Text(
                             'Lupa Kata Sandi?',

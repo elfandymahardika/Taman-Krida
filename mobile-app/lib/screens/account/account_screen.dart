@@ -22,10 +22,9 @@ class AccountScreen extends StatelessWidget {
     showAppBottomSheet<void>(
       context,
       builder: (sheetContext) => SheetMessage(
-        symbol: '→',
         title: 'Keluar dari akun?',
         message:
-            'Anda perlu masuk kembali untuk melihat tiket dan riwayat sewa.',
+            'Anda perlu masuk kembali untuk melihat tiket dan pengajuan sewa.',
         actions: [
           AppButton(
             label: 'Ya, Keluar',
@@ -70,8 +69,8 @@ class AccountScreen extends StatelessWidget {
                 child: Row(
                   children: [
                     Container(
-                      width: 56,
-                      height: 56,
+                      width: 60,
+                      height: 60,
                       alignment: Alignment.center,
                       decoration: const BoxDecoration(
                         color: AppColors.maroon,
@@ -145,11 +144,10 @@ class AccountScreen extends StatelessWidget {
               AccountMenuTile(
                 symbol: '🔔',
                 title: 'Notifikasi',
-                subtitle: 'Pengingat acara & status pengajuan',
-                onTap: () => navigator.pushNamed(
-                  AppRoutes.comingSoon,
-                  arguments: 'Notifikasi',
-                ),
+                subtitle: state.unreadCount > 0
+                    ? '${state.unreadCount} notifikasi belum dibaca'
+                    : 'Pengingat acara & status pengajuan',
+                onTap: () => navigator.pushNamed(AppRoutes.notifications),
               ),
               const SizedBox(height: 12),
               AccountMenuTile(

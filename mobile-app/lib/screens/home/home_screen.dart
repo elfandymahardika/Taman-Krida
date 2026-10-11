@@ -42,22 +42,19 @@ class HomeScreen extends StatelessWidget {
       '▣',
       'Virtual Galeri',
       'Arsip foto & video pementasan budaya',
-      AppRoutes.comingSoon,
-      'Virtual Galeri',
+      AppRoutes.gallery,
     ),
     FeatureItem(
       '✦',
       'Direktori Komunitas',
       'Temukan sanggar & komunitas seni lokal',
-      AppRoutes.comingSoon,
-      'Direktori Komunitas',
+      AppRoutes.communities,
     ),
     FeatureItem(
       '❖',
       'Edukasi Budaya',
       'Sejarah, filosofi & dokumentasi kesenian',
-      AppRoutes.comingSoon,
-      'Edukasi Budaya',
+      AppRoutes.education,
     ),
   ];
 

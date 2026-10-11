@@ -50,15 +50,16 @@ Future<T?> showAppBottomSheet<T>(
 class SheetMessage extends StatelessWidget {
   const SheetMessage({
     super.key,
-    required this.symbol,
     required this.title,
     required this.message,
     required this.actions,
+    this.symbol,
     this.symbolColor = AppColors.maroon,
     this.symbolBackground = AppColors.maroonTint,
   });
 
-  final String symbol;
+  /// Ikon/emoji di atas judul. `null` jika sheet tanpa ikon.
+  final String? symbol;
   final String title;
   final String message;
   final List<Widget> actions;
@@ -70,17 +71,22 @@ class SheetMessage extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: 56,
-          height: 56,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: symbolBackground,
-            shape: BoxShape.circle,
+        if (symbol != null) ...[
+          Container(
+            width: 52,
+            height: 52,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: symbolBackground,
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              symbol!,
+              style: AppText.poppins(24, color: symbolColor),
+            ),
           ),
-          child: Text(symbol, style: AppText.poppins(24, color: symbolColor)),
-        ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 16),
+        ],
         Text(title, textAlign: TextAlign.center, style: AppText.playfair(20)),
         const SizedBox(height: 16),
         Text(

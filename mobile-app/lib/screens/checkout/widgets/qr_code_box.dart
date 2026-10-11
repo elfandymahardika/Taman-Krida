@@ -7,7 +7,7 @@ import '../../../core/theme/app_colors.dart';
 /// Gambar QR tiruan (simulasi QRIS dinamis) yang dibentuk dari [seed].
 /// Bukan QR asli — cukup untuk prototipe tanpa payment gateway.
 class QrCodeBox extends StatelessWidget {
-  const QrCodeBox({super.key, required this.seed, this.size = 180});
+  const QrCodeBox({super.key, required this.seed, this.size = 220});
 
   final String seed;
   final double size;

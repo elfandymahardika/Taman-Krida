@@ -2,9 +2,15 @@
 
 Prototipe **Mobile Application untuk pengguna akhir** Taman Krida Budaya Jawa Timur (TKBJ), dibuat dengan **Flutter** untuk tugas Ujian Tengah Semester (UTS).
 
-Aplikasi ini adalah pasangan dari [Dashboard Web admin](../admin-dashboard) dalam satu rancangan sistem. Pengunjung dapat melihat profil & denah TKBJ, menjelajah kalender acara, memesan tiket pertunjukan sampai pembayaran (simulasi), mengajukan sewa gedung, dan melihat tiket serta riwayat sewa di akun mereka.
+Aplikasi ini adalah pasangan dari [Dashboard Web admin](../admin-dashboard) dalam satu rancangan sistem. Pengunjung dapat:
 
-Tampilan mengikuti desain Figma tim (halaman **mobile**, frame 390 px). Seluruh data adalah **data contoh (dummy)** di memori, tanpa database.
+- melihat profil & denah TKBJ dan kalender acara;
+- memesan tiket pertunjukan sampai pembayaran (simulasi);
+- mengajukan sewa gedung lewat 5 langkah, sampai bukti reservasi;
+- menjelajah Virtual Galeri, Direktori Komunitas, dan Edukasi Budaya;
+- mengelola tiket, riwayat sewa, profil, dan notifikasi di akun mereka.
+
+Tampilan mengikuti desain Figma tim ([Highfi-Taman-Krida](https://www.figma.com/design/arjM0e1ApzkZ58oERTzCa8/Highfi-Taman-Krida), halaman **mobile**, frame 390 px). Seluruh data adalah **data contoh (dummy)** di memori, tanpa database.
 
 ---
 
@@ -12,13 +18,13 @@ Tampilan mengikuti desain Figma tim (halaman **mobile**, frame 390 px). Seluruh 
 
 | Ketentuan | Implementasi |
 |---|---|
-| Halaman login (simulasi) | `LoginScreen`: validasi email & kata sandi, pesan "email belum terdaftar" / "kata sandi salah", tombol isi akun demo. Halaman **Daftar Akun** juga tersedia. |
-| Halaman utama | `HomeScreen`: hero, tentang TKBJ, 7 kartu fitur utama. |
-| Form input | Login, Daftar Akun, **Data Pemesan** (checkout), **Formulir Sewa Gedung**, Edit Profil. |
-| Halaman yang menampilkan data / hasil input | Kalender & detail acara, **E-Tiket** setelah bayar, **Tiket Saya**, **Riwayat Sewa Gedung**, Akun Saya. Data yang diisi di form langsung muncul di halaman ini. |
-| Navigasi antarhalaman | 18 rute bernama (`lib/routes/app_routes.dart`), menu navigasi layar penuh, breadcrumb, rute akun yang dilindungi login (otomatis diarahkan ke halaman Masuk). |
-| Validasi sederhana | Wajib isi, format email, nomor WhatsApp `08…` 10–13 digit, kata sandi ≥ 8 karakter, persetujuan ketentuan, keranjang tidak boleh kosong, jumlah tiket 0–4, **jadwal venue bentrok**, **jam sewa melewati 22:00**. |
-| Data dummy | `lib/data/dummy/dummy_data.dart` (acara, fasilitas, akun, pesanan & sewa awal). |
+| Halaman login (simulasi) | `LoginScreen`: validasi email & kata sandi, pesan "email belum terdaftar" / "kata sandi salah", tombol isi akun demo, sheet **Lupa Kata Sandi**. Halaman **Daftar Akun** juga tersedia. |
+| Halaman utama | `HomeScreen`: hero, tentang TKBJ, 7 kartu fitur utama yang semuanya bisa dibuka. |
+| Form input | Login, Daftar Akun, Lupa Kata Sandi, **Data Pemesan** (checkout), **Formulir Kegiatan** & **Unggah Berkas** (sewa gedung), **Daftarkan Komunitas**, Edit Profil. |
+| Halaman yang menampilkan data / hasil input | Kalender & detail acara, galeri, komunitas, materi edukasi, **E-Tiket**, **Tiket Saya**, **Status Pengajuan**, **Bukti Reservasi**, **Riwayat Sewa**, **Notifikasi**, Akun Saya. Data yang diisi di form langsung muncul di halaman ini. |
+| Navigasi antarhalaman | 32 rute bernama (`lib/routes/app_routes.dart`), menu navigasi layar penuh, breadcrumb, rute akun yang dilindungi login (otomatis diarahkan ke halaman Masuk). |
+| Validasi sederhana | Wajib isi, format email, nomor WhatsApp `08…` 10–13 digit, kata sandi ≥ 8 karakter, persetujuan ketentuan, keranjang tidak boleh kosong, jumlah tiket 0–4, **tanggal/slot venue penuh**, **3 berkas sewa wajib diunggah**, kategori komunitas wajib dipilih, deskripsi ≥ 20 karakter. |
+| Data dummy | `lib/data/dummy/` (acara, fasilitas, galeri, komunitas, materi edukasi, akun, pesanan, pengajuan sewa, notifikasi). |
 | Rancangan AI | Lihat [Rancangan Fitur AI](#rancangan-fitur-ai). |
 
 ### Akun demo
@@ -48,6 +54,8 @@ flutter run            # emulator / HP Android
 flutter run -d chrome  # atau di browser
 ```
 
+Proyek juga bisa dibuka di **Android Studio** (plugin Flutter): File → Open → pilih folder `mobile-app`, lalu Run.
+
 ### Build
 
 ```bash
@@ -59,10 +67,11 @@ flutter build web             # hasil: build/web/
 
 ```bash
 flutter analyze   # analisis statis (lint)
-flutter test      # 75 test: unit, alur login & checkout, responsif 4 ukuran layar
+flutter test      # 151 test: unit, alur fitur, dan responsif
 ```
 
-`test/responsive_test.dart` merender **17 layar** pada 4 ukuran (320×568, 430×932, landscape 844×390, tablet 1024×768) dan gagal jika ada *overflow*.
+- `test/widget_test.dart` dan `test/feature_flows_test.dart` menguji alur login, checkout tiket, sewa gedung (ajukan → disetujui/ditolak → bayar), validasi unggah berkas, daftar komunitas, filter galeri, dan notifikasi.
+- `test/responsive_test.dart` merender **34 layar** pada 4 ukuran (320×568, 430×932, landscape 844×390, tablet 1024×768) dan gagal jika ada *overflow*.
 
 Screenshot di bawah dibuat otomatis dengan:
 
@@ -87,13 +96,15 @@ flutter test test_screenshots --update-goldens
 |---|---|
 | Ikon SVG (`assets/icons/`) dan foto (`assets/images/`) | Diekspor dari desain Figma |
 | Font Poppins & Playfair Display | Google Fonts (OFL), dibundel agar tampil sama tanpa internet |
-| `TkbjSymbolsMath.ttf`, `TkbjSymbols2.ttf` | Subset Noto Sans Math & Noto Sans Symbols 2 (OFL), hanya berisi simbol desain: ◆ ◇ ◈ ◉ ▣ ✦ ❖ ✓ → ← ✎ ▾ |
+| `TkbjSymbolsMath.ttf`, `TkbjSymbols2.ttf` | Subset Noto Sans Math & Noto Sans Symbols 2 (OFL), hanya berisi simbol desain: ◆ ◇ ◈ ◉ ▣ ▲ ● ▶ ✦ ❖ ✓ ✕ ☀ ✎ → ← ↑ ▾ |
 
 State management memakai `ChangeNotifier` + `InheritedNotifier` bawaan Flutter (tanpa package tambahan).
 
 ---
 
 ## Screenshot
+
+**Beranda, akun, profil & acara**
 
 | Beranda | Menu navigasi | Masuk | Daftar akun |
 |---|---|---|---|
@@ -103,23 +114,58 @@ State management memakai `ChangeNotifier` + `InheritedNotifier` bawaan Flutter (
 |---|---|---|---|
 | <img src="docs/screenshots/05-profil-denah.png" width="200"> | <img src="docs/screenshots/06-kalender-acara.png" width="200"> | <img src="docs/screenshots/07-detail-acara.png" width="200"> | <img src="docs/screenshots/08-tiket-pertunjukan.png" width="200"> |
 
-| Checkout 1: data pemesan | Checkout 2: metode bayar | Checkout 3: konfirmasi QRIS | Checkout 4: e-tiket |
+**Checkout tiket**
+
+| 1. Data pemesan | 2. Metode bayar | 3. Konfirmasi QRIS | 4. E-tiket |
 |---|---|---|---|
 | <img src="docs/screenshots/09-checkout-data-pemesan.png" width="200"> | <img src="docs/screenshots/10-checkout-metode-bayar.png" width="200"> | <img src="docs/screenshots/11-checkout-konfirmasi.png" width="200"> | <img src="docs/screenshots/12-checkout-berhasil.png" width="200"> |
 
-| Formulir sewa gedung | Akun saya | Tiket saya | Riwayat sewa |
+**Sewa gedung (5 langkah + hasil verifikasi)**
+
+| 1. Pilih venue | 2. Cek jadwal | 3. Formulir | 4. Unggah berkas |
 |---|---|---|---|
-| <img src="docs/screenshots/13-sewa-gedung.png" width="200"> | <img src="docs/screenshots/14-akun-saya.png" width="200"> | <img src="docs/screenshots/15-tiket-saya.png" width="200"> | <img src="docs/screenshots/16-riwayat-sewa.png" width="200"> |
+| <img src="docs/screenshots/13-sewa-pilih-venue.png" width="200"> | <img src="docs/screenshots/14-sewa-cek-jadwal.png" width="200"> | <img src="docs/screenshots/15-sewa-formulir.png" width="200"> | <img src="docs/screenshots/16-sewa-unggah-berkas.png" width="200"> |
+
+| 5. Status verifikasi | Ditolak | Pembayaran sewa | Bukti reservasi |
+|---|---|---|---|
+| <img src="docs/screenshots/17-sewa-status-verifikasi.png" width="200"> | <img src="docs/screenshots/18-sewa-ditolak.png" width="200"> | <img src="docs/screenshots/19-sewa-pembayaran.png" width="200"> | <img src="docs/screenshots/20-sewa-bukti-reservasi.png" width="200"> |
+
+**Galeri & komunitas**
+
+| Virtual galeri | Detail galeri | Direktori komunitas | Detail komunitas |
+|---|---|---|---|
+| <img src="docs/screenshots/21-virtual-galeri.png" width="200"> | <img src="docs/screenshots/22-galeri-detail.png" width="200"> | <img src="docs/screenshots/23-direktori-komunitas.png" width="200"> | <img src="docs/screenshots/24-komunitas-detail.png" width="200"> |
+
+**Edukasi budaya**
+
+| Daftarkan komunitas | Daftar materi | Tab sejarah | Tab filosofi |
+|---|---|---|---|
+| <img src="docs/screenshots/25-daftar-komunitas.png" width="200"> | <img src="docs/screenshots/26-edukasi-budaya.png" width="200"> | <img src="docs/screenshots/27-edukasi-sejarah.png" width="200"> | <img src="docs/screenshots/28-edukasi-filosofi.png" width="200"> |
+
+**Akun pengguna**
+
+| Tab foto/video | Akun saya | Tiket saya | Riwayat sewa |
+|---|---|---|---|
+| <img src="docs/screenshots/29-edukasi-foto-video.png" width="200"> | <img src="docs/screenshots/30-akun-saya.png" width="200"> | <img src="docs/screenshots/31-tiket-saya.png" width="200"> | <img src="docs/screenshots/32-riwayat-sewa.png" width="200"> |
+
+| Edit profil | Notifikasi |
+|---|---|
+| <img src="docs/screenshots/33-edit-profil.png" width="200"> | <img src="docs/screenshots/34-notifikasi.png" width="200"> |
 
 ---
 
 ## Alur utama
 
-1. **Pesan tiket:** Beranda → Kalender Acara → Detail Acara → *"Ingin memesan tiket?"* → Pesan Tiket (stepper 0–4) → Data Pemesan → Metode Bayar (QRIS / Virtual Account / E-Wallet) → Konfirmasi → **E-Tiket + kode booking** → Tiket Saya.
-2. **Sewa gedung:** Profil & Denah (pin peta / kartu fasilitas) atau menu Sewa Gedung → Formulir Kegiatan (venue, tanggal, jam, durasi, ringkasan biaya otomatis) → *Pengajuan terkirim* → Riwayat Sewa.
-3. **Akun:** Masuk / Daftar → Akun Saya → Tiket Saya, Riwayat Sewa, Edit Profil, Keluar.
+1. **Pesan tiket:** Beranda → Kalender Acara (filter kategori & rentang waktu) → Detail Acara → *"Ingin memesan tiket?"* → Pesan Tiket (stepper 0–4) → Data Pemesan → Metode Bayar (QRIS / Virtual Account / E-Wallet) → Konfirmasi → **E-Tiket + kode booking** → Tiket Saya.
+2. **Sewa gedung:** Pilih Venue → Cek Jadwal (kalender ketersediaan + slot waktu; tanggal penuh membuka sheet *"Jadwal tidak tersedia"*) → Formulir Kegiatan → Unggah Berkas (KTP, surat permohonan, proposal) → *Pengajuan terkirim* → **Status Verifikasi**. Di layar status ada tombol **simulasi keputusan admin**:
+   - **Disetujui** → Pembayaran Sewa → **Bukti Reservasi**;
+   - **Ditolak** → catatan admin → **Ajukan Ulang** (venue & nama kegiatan terisi otomatis).
+3. **Virtual Galeri:** filter kategori → detail dengan tab Foto (geser foto, thumbnail) dan Video.
+4. **Direktori Komunitas:** filter kategori → detail sanggar (statistik, jadwal latihan, kontak) → *Hubungi via WhatsApp*; atau **Daftarkan Komunitas** → *Pendaftaran terkirim* → notifikasi baru.
+5. **Edukasi Budaya:** 6 materi → detail dengan tab **Sejarah** (linimasa), **Filosofi**, dan **Foto/Video**.
+6. **Akun:** Masuk / Daftar → Akun Saya → Tiket Saya, Riwayat Sewa (tombol sesuai status), Edit Profil, **Notifikasi** (tandai dibaca, buka halaman terkait), Keluar.
 
-Fitur **Virtual Galeri, Direktori Komunitas, Edukasi Budaya,** dan **Notifikasi** sudah dirancang di Figma, tetapi pada tahap UTS ini baru tampil sebagai halaman "Segera Hadir".
+Pembelian tiket, keputusan sewa, dan pendaftaran komunitas otomatis menambah notifikasi baru.
 
 ---
 
@@ -127,7 +173,8 @@ Fitur **Virtual Galeri, Direktori Komunitas, Edukasi Budaya,** dan **Notifikasi*
 
 - Navbar tetap di atas; isi dan footer berada di dalam `SingleChildScrollView`, jadi tidak ada *bottom overflow* di ponsel kecil atau saat landscape.
 - `ContentSection` membatasi lebar konten maksimal 720 px dan menaruhnya di tengah pada tablet/landscape, sementara latar section tetap selebar layar.
-- `ResponsiveGrid` (berbasis `LayoutBuilder`) menyusun kartu 1 kolom di ponsel, 2–3 kolom di layar lebar.
+- `ResponsiveGrid` (berbasis `LayoutBuilder`) menyusun kartu 1 kolom di ponsel dan 2–4 kolom di layar lebar. Grid galeri: 2 kolom di ponsel.
+- Kalender ketersediaan dan stepper sewa memakai kolom `Expanded` selebar sama; label stepper mengecil (`FittedBox`) di layar sempit.
 - Pin peta denah memakai posisi relatif (0–1) terhadap ukuran peta, sehingga tetap di titik yang sama di semua lebar layar.
 - Teks panjang memakai `Expanded`/`Flexible`, `maxLines` + ellipsis, dan `Wrap`.
 
@@ -144,13 +191,13 @@ Pembayaran tiket dan sewa gedung lewat transfer bank harus dicocokkan admin seca
 1. Di layar konfirmasi pembayaran, pengguna **mengunggah foto bukti transfer** (kamera atau galeri).
 2. Aplikasi mengirim foto ke backend. **OCR / vision model** membaca bank, nominal, nama pengirim, tanggal, dan nomor referensi.
 3. Sistem mencocokkan hasilnya dengan tagihan (kode booking, total, nama pemesan) dan mendeteksi anomali, misalnya bukti dipakai ulang atau nominal tidak sesuai.
-4. Pengguna langsung melihat status di **Tiket Saya / Riwayat Sewa**: *"Sedang diverifikasi"*, *"Lunas"*, atau *"Perlu unggah ulang: nominal tidak sesuai"*.
+4. Pengguna langsung melihat status di **Tiket Saya / Riwayat Sewa** dan menerima **notifikasi**: *"Sedang diverifikasi"*, *"Lunas"*, atau *"Perlu unggah ulang: nominal tidak sesuai"*.
 5. Admin di Dashboard Web melihat saran AI beserta skor keyakinannya dan tetap memegang **keputusan akhir**.
 
 | Input (dari aplikasi) | Output (ke pengguna) |
 |---|---|
 | Foto bukti transfer + kode booking | Status verifikasi dan alasan singkat |
-| Data tagihan pesanan | E-tiket terbit lebih cepat setelah dinyatakan lunas |
+| Data tagihan pesanan | E-tiket / bukti reservasi terbit lebih cepat setelah dinyatakan lunas |
 
 **Rencana teknologi:** `image_picker` di Flutter untuk mengambil foto, backend (Firebase Functions / Node.js) sebagai perantara ke layanan OCR atau model multimodal melalui API, dan notifikasi push saat status berubah.
 
@@ -174,24 +221,29 @@ mobile-app/
 │   │   ├── theme/                token warna, gaya teks, ThemeData
 │   │   └── utils/                formatter rupiah/tanggal, validator, breakpoint
 │   ├── data/
-│   │   ├── models/               CulturalEvent, Facility, TicketOrder, RentalRequest, UserAccount
-│   │   └── dummy/                data contoh
-│   ├── state/app_state.dart      sesi login, keranjang, pesanan, pengajuan sewa
+│   │   ├── models/               acara, fasilitas, pesanan, pengajuan sewa, galeri,
+│   │   │                         komunitas, materi edukasi, notifikasi, akun
+│   │   └── dummy/                data contoh per fitur
+│   ├── state/app_state.dart      sesi, keranjang, pesanan, draft & pengajuan sewa,
+│   │                             pendaftaran komunitas, notifikasi
 │   ├── routes/app_routes.dart    nama rute, router, proteksi login
 │   ├── widgets/                  komponen global yang dipakai ulang
 │   │   ├── layout/               TkbjScaffold, navbar, footer, PageHeader, ContentSection, ResponsiveGrid
-│   │   ├── common/               AppButton, AppCard, PillBadge, InfoRow, bottom sheet & toast
-│   │   ├── form/                 LabeledTextField, PickerField, AppCheckbox
-│   │   └── interactive/          ChipFilter, QtyStepper, StepTracker (komponen interaktif Figma)
+│   │   ├── common/               AppButton, AppCard, PillBadge, InfoRow, SectionCard, ReceiptCard,
+│   │   │                         ArtworkImage, VideoPreview, bottom sheet & toast
+│   │   ├── form/                 LabeledTextField, ReadOnlyField, UploadField, AppCheckbox
+│   │   └── interactive/          ChipFilter(Bar), QtyStepper, StepTracker, SegmentedTabs, UnderlineTabs
 │   └── screens/                  satu folder per fitur, widget khusus fitur di subfolder widgets/
-│       ├── home/  menu/  auth/  profile/  events/  tickets/
-│       ├── checkout/  rental/  account/  coming_soon/
-├── test/                         unit, widget, dan responsive test
+│       ├── home/  menu/  auth/  profile/  events/  tickets/  checkout/
+│       ├── rental/  gallery/  community/  education/  account/
+├── test/                         unit, alur fitur, dan responsive test
 └── test_screenshots/             generator screenshot README
 ```
 
 ## Catatan
 
 - Status bar dan *home indicator* pada frame Figma adalah bingkai perangkat, sehingga tidak digambar ulang; aplikasi memakai status bar asli sistem operasi.
-- Pembayaran adalah **simulasi**. Kode QR di layar konfirmasi adalah gambar tiruan, bukan QRIS sungguhan.
+- **Simulasi:** pembayaran (kode QR tiruan), unggah berkas/foto (tanpa file picker), tombol WhatsApp, pemutar video, dan keputusan admin sewa. Semua ditandai "simulasi prototype" di aplikasi.
+- **Foto yang belum diekspor dari Figma:** gamelan, latihan sanggar, dan jaranan. Batas akses Figma MCP (paket Starter) mencegah pengunduhan, sehingga aplikasi menampilkan sampul gradien maroon sebagai gantinya. Untuk memakai foto asli, ekspor dari Figma lalu simpan sebagai `assets/images/gamelan.png`, `assets/images/latihan-sanggar.png`, dan `assets/images/jaranan.png`; tidak perlu mengubah kode.
+- Kalender ketersediaan sewa dihitung dari data contoh: tanggal sebelum hari ini tidak bisa dipilih, beberapa tanggal/slot sengaja ditandai penuh, dan slot yang sudah diajukan otomatis menjadi penuh.
 - Data tersimpan di memori dan kembali ke data contoh saat aplikasi ditutup.

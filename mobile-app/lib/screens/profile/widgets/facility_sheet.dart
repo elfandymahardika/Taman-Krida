@@ -7,7 +7,7 @@ import '../../../data/models/facility.dart';
 import '../../../routes/app_routes.dart';
 import '../../../widgets/common/app_button.dart';
 import '../../../widgets/common/app_feedback.dart';
-import 'facility_card.dart';
+import '../../../widgets/common/pill_badge.dart';
 
 /// Overlay detail fasilitas saat pin atau kartu ditekan.
 Future<void> showFacilitySheet(BuildContext context, Facility facility) {
@@ -20,19 +20,24 @@ Future<void> showFacilitySheet(BuildContext context, Facility facility) {
           borderRadius: BorderRadius.circular(12),
           child: Image.asset(
             facility.imageAsset,
-            height: 160,
+            height: 170,
             fit: BoxFit.cover,
             cacheWidth: 900,
           ),
         ),
         const SizedBox(height: 16),
-        Row(
-          children: [
-            NumberDot(number: facility.number),
-            const SizedBox(width: 8),
-            Expanded(child: Text(facility.name, style: AppText.playfair(20))),
-          ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: PillBadge(
+            'Titik ${facility.number}',
+            fontSize: 10,
+            color: AppColors.white,
+            background: AppColors.maroon,
+            weight: FontWeight.w600,
+          ),
         ),
+        const SizedBox(height: 6),
+        Text(facility.name, style: AppText.playfair(20)),
         const SizedBox(height: 8),
         Text(
           facility.description,
