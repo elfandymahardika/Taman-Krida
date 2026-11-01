@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../data/dummy/gallery_data.dart';
+import '../../state/app_state.dart';
+import '../../widgets/common/load_status.dart';
 import '../../routes/app_routes.dart';
 import '../../widgets/interactive/chip_filter_bar.dart';
 import '../../widgets/layout/content_section.dart';
@@ -20,16 +21,19 @@ class GalleryScreen extends StatefulWidget {
 }
 
 class _GalleryScreenState extends State<GalleryScreen> {
-  String _category = GalleryData.categories.first;
+  static const _all = 'Semua';
+  String _category = _all;
 
   @override
   Widget build(BuildContext context) {
-    final items = GalleryData.items
-        .where(
-          (item) =>
-              _category == GalleryData.categories.first ||
-              item.category == _category,
-        )
+    final state = AppStateScope.of(context);
+    // Chip kategori mengikuti koleksi yang ada di galeri.
+    final categories = [
+      _all,
+      ...{for (final item in state.gallery) item.category},
+    ];
+    final items = state.gallery
+        .where((item) => _category == _all || item.category == _category)
         .toList();
 
     return TkbjScaffold(
@@ -45,7 +49,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
         ContentSection(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: ChipFilterBar(
-            options: GalleryData.categories,
+            options: categories,
             selected: _category,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             onSelected: (value) => setState(() => _category = value),
@@ -53,7 +57,9 @@ class _GalleryScreenState extends State<GalleryScreen> {
         ),
         ContentSection(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-          child: items.isEmpty
+          child: state.catalogState != LoadState.ready
+              ? LoadStatus.catalog(state)
+              : items.isEmpty
               ? Text(
                   'Belum ada koleksi untuk kategori ini.',
                   style: AppText.poppins(12, color: AppColors.muted),

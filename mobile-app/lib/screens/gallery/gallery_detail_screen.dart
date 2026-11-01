@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../data/dummy/gallery_data.dart';
+import '../../state/app_state.dart';
+import '../../widgets/common/load_status.dart';
 import '../../data/models/gallery_item.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_feedback.dart';
@@ -26,7 +27,8 @@ class GalleryDetailScreen extends StatefulWidget {
 }
 
 class _GalleryDetailScreenState extends State<GalleryDetailScreen> {
-  late final GalleryItem _item = GalleryData.byId(widget.itemId);
+  GalleryItem get _item =>
+      AppStateScope.read(context).galleryById(widget.itemId)!;
   int _tab = 0;
   int _index = 0;
 
@@ -38,7 +40,23 @@ class _GalleryDetailScreenState extends State<GalleryDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final item = _item;
+    final state = AppStateScope.of(context);
+    final found = state.galleryById(widget.itemId);
+    if (found == null) {
+      return TkbjScaffold(
+        children: [
+          ContentSection(
+            child: state.catalogState == LoadState.ready
+                ? const LoadStatus(
+                    loading: false,
+                    error: 'Koleksi galeri tidak ditemukan.',
+                  )
+                : LoadStatus.catalog(state),
+          ),
+        ],
+      );
+    }
+    final item = found;
     final meta = _isVideo
         ? 'Video · ${item.videoMinutes} menit · ${item.venue} · ${item.period}'
         : 'Foto · ${item.photos.length} gambar · ${item.venue} · ${item.period}';

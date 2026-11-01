@@ -52,6 +52,19 @@ abstract final class Formatters {
   /// 8 -> "08:00"
   static String hour(int hour) => '${twoDigits(hour)}:00';
 
+  /// 2026-10-02 -> "2026-10-02" (format tanggal API).
+  static String isoDate(DateTime date) =>
+      '${date.year}-${twoDigits(date.month)}-${twoDigits(date.day)}';
+
+  /// 1258291 -> "1,2 MB", 344064 -> "336 KB"
+  static String fileSize(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      final mb = (bytes / 1024 / 1024).toStringAsFixed(1);
+      return '${mb.replaceAll('.', ',').replaceAll(',0', '')} MB';
+    }
+    return '${(bytes / 1024).round().clamp(1, 1023)} KB';
+  }
+
   /// "06 Okt 2026 · 14:20 WIB"
   static String dateTime(DateTime date) =>
       '${shortDate(date)} · ${twoDigits(date.hour)}:${twoDigits(date.minute)} '

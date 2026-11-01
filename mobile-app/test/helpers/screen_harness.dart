@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tkbj_mobile/app.dart';
@@ -5,6 +8,7 @@ import 'package:tkbj_mobile/data/dummy/dummy_data.dart';
 import 'package:tkbj_mobile/data/models/facility.dart';
 import 'package:tkbj_mobile/data/models/rental_request.dart';
 import 'package:tkbj_mobile/data/models/ticket_order.dart';
+import 'package:tkbj_mobile/data/repository/demo_repository.dart';
 import 'package:tkbj_mobile/routes/app_routes.dart';
 import 'package:tkbj_mobile/state/app_state.dart';
 
@@ -30,16 +34,35 @@ class ScreenCase {
   final double height;
 
   /// Menyiapkan state tambahan sebelum layar dibuka.
-  final void Function(AppState state)? prepare;
+  final Future<void> Function(AppState state)? prepare;
+}
+
+/// Berkas PDF kecil pengganti pemilih berkas sistem.
+UploadedFile fakeFile([String name = 'berkas.pdf']) => UploadedFile.fromBytes(
+  name,
+  Uint8List.fromList(utf8.encode('%PDF-1.4\n%contoh\n')),
+);
+
+Future<UploadedFile?> fakePick({required bool imagesOnly}) async =>
+    fakeFile(imagesOnly ? 'bukti.jpg' : 'berkas.pdf');
+
+/// State dengan data contoh di memori (tanpa server) & pemilih berkas palsu.
+AppState demoState() =>
+    AppState(repository: DemoRepository(), pickFile: fakePick);
+
+/// [AppState] yang sudah memuat data contoh dan masuk sebagai akun demo.
+Future<AppState> signedInState() async {
+  final state = demoState();
+  await state.init();
+  await state.login(DummyData.demoAccount.email, DummyData.demoPassword);
+  return state;
 }
 
 /// State berisi akun login, keranjang, dan data pemesan agar semua layar
 /// (termasuk checkout & akun) bisa dirender langsung.
-AppState seededState({bool signedIn = true}) {
-  final state = AppState();
-  if (signedIn) {
-    state.login(DummyData.demoAccount.email, DummyData.demoAccount.password);
-  }
+Future<AppState> seededState({bool signedIn = true}) async {
+  final state = signedIn ? await signedInState() : demoState();
+  await state.init();
   state
     ..setQuantity(DummyData.events[0].id, 2)
     ..setQuantity(DummyData.events[1].id, 1)
@@ -56,14 +79,16 @@ AppState seededState({bool signedIn = true}) {
 Facility get pendopo => DummyData.facilities.first;
 
 /// Tanggal & slot pertama yang masih tersedia untuk [facility], dimulai
-/// beberapa hari dari sekarang.
-(DateTime, RentalSlot) firstAvailableBooking(
+/// beberapa hari setelah "hari ini" data contoh.
+Future<(DateTime, RentalSlot)> firstAvailableBooking(
   AppState state,
   Facility facility,
-) {
-  var date = DateUtils.dateOnly(DateTime.now()).add(const Duration(days: 3));
+) async {
+  var date = state.today.add(const Duration(days: 3));
+  await state.loadAvailability(facility, date);
   while (state.isDateFull(facility, date)) {
     date = date.add(const Duration(days: 1));
+    await state.loadAvailability(facility, date);
   }
   final slot = RentalSlot.values.firstWhere(
     (s) => !state.isSlotTaken(facility, date, s),
@@ -71,18 +96,19 @@ Facility get pendopo => DummyData.facilities.first;
   return (date, slot);
 }
 
-void _draftVenue(AppState state) => state.startRental(facility: pendopo);
+Future<void> _draftVenue(AppState state) async =>
+    state.startRental(facility: pendopo);
 
-void _draftSchedule(AppState state) {
-  _draftVenue(state);
-  final (date, slot) = firstAvailableBooking(state, pendopo);
+Future<void> _draftSchedule(AppState state) async {
+  await _draftVenue(state);
+  final (date, slot) = await firstAvailableBooking(state, pendopo);
   state
     ..selectRentalDate(date)
     ..selectRentalSlot(slot);
 }
 
-void _draftForm(AppState state) {
-  _draftSchedule(state);
+Future<void> _draftForm(AppState state) async {
+  await _draftSchedule(state);
   state.saveRentalForm(
     activityName: 'Festival Tari Topeng Malangan 2026',
     applicantName: 'Yayasan Mekar Sari Malang',
@@ -90,14 +116,15 @@ void _draftForm(AppState state) {
   );
 }
 
-void _draftDocuments(AppState state) {
-  _draftForm(state);
+Future<void> _draftDocuments(AppState state) async {
+  await _draftForm(state);
   state
-    ..attachRentalDocument(DummyData.rentalDocuments[0])
-    ..attachRentalDocument(DummyData.rentalDocuments[1]);
+    ..attachRentalDocument('ktp', fakeFile('ktp.pdf'))
+    ..attachRentalDocument('surat', fakeFile('surat-permohonan.pdf'));
 }
 
-void _approvePending(AppState state) => state.approveRental('SG-1026-0020');
+Future<void> _approvePending(AppState state) =>
+    state.simulateAdmin((demo) => demo.approveRental('SG-1026-0020'));
 
 const screenCases = [
   ScreenCase('01-beranda', AppRoutes.home, height: 1820, signedIn: false),
@@ -230,8 +257,8 @@ Future<void> pumpScreen(
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
-  final appState = state ?? seededState(signedIn: screen.signedIn);
-  screen.prepare?.call(appState);
+  final appState = state ?? await seededState(signedIn: screen.signedIn);
+  await screen.prepare?.call(appState);
   await tester.pumpWidget(TkbjApp(state: appState));
   await tester.pumpAndSettle();
   if (screen.route != AppRoutes.home) {

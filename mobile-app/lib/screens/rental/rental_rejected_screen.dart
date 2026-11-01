@@ -92,18 +92,20 @@ class RentalRejectedScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              SectionCard(
-                title: 'Yang perlu diperbaiki',
-                spacing: 4,
-                children: [
-                  for (final fix in request.fixes)
-                    Text(
-                      '•  $fix',
-                      style: AppText.poppins(13, color: AppColors.muted),
-                    ),
-                ],
-              ),
+              if (request.fixes.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                SectionCard(
+                  title: 'Yang perlu diperbaiki',
+                  spacing: 4,
+                  children: [
+                    for (final fix in request.fixes)
+                      Text(
+                        '•  $fix',
+                        style: AppText.poppins(13, color: AppColors.muted),
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 16),
               AppButton(
                 label: 'Ajukan Ulang',

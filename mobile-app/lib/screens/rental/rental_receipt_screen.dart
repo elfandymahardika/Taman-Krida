@@ -79,8 +79,13 @@ class RentalReceiptScreen extends StatelessWidget {
                   ReceiptRow(
                     'Venue & Waktu',
                     '${request.facility.name} · ${request.durationHours} jam '
-                        '(${request.slot.shortLabel} WIB)',
+                        '(${request.timeLabel} WIB)',
                     stacked: true,
+                  ),
+                  ReceiptRow(
+                    'Pembayaran',
+                    '${Formatters.rupiah(request.amount)} · '
+                        '${request.paymentMethod?.shortLabel ?? 'Lunas'}',
                   ),
                 ],
                 codeLabel: 'Kode Reservasi Anda',

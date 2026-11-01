@@ -32,7 +32,7 @@ abstract final class DummyData {
       date: DateTime(2026, 6, 3),
       startTime: '19:30',
       endTime: '23:00',
-      venue: 'Panggung Terbuka TKBJ',
+      venue: 'Panggung Terbuka',
       venueShort: 'Terbuka',
       imageAsset: AppImages.acaraWayang,
       price: 35000,
@@ -72,7 +72,7 @@ abstract final class DummyData {
       date: DateTime(2026, 6, 14),
       startTime: '09:00',
       endTime: '16:00',
-      venue: 'Gedung Kesenian TKBJ',
+      venue: 'Gedung Kesenian & Galeri',
       venueShort: 'Gedung Kesenian',
       imageAsset: AppImages.fasilitasGedung,
       price: 0,
@@ -92,7 +92,7 @@ abstract final class DummyData {
       date: DateTime(2026, 6, 19),
       startTime: '19:00',
       endTime: '22:00',
-      venue: 'Panggung Terbuka TKBJ',
+      venue: 'Panggung Terbuka',
       venueShort: 'Terbuka',
       imageAsset: AppImages.acaraKetoprak,
       price: 30000,
@@ -103,7 +103,7 @@ abstract final class DummyData {
 
   static final facilities = <Facility>[
     const Facility(
-      id: 'pendopo-agung',
+      id: 'pendopo',
       number: 1,
       name: 'Pendopo Agung TKBJ',
       shortName: 'Pendopo Agung',
@@ -113,14 +113,14 @@ abstract final class DummyData {
       capacityLabel: 'Kapasitas up to 500 orang',
       imageAsset: AppImages.fasilitasPendopo,
       mapPosition: Offset(0.198, 0.254),
-      ratePerHour: 3500000,
+      rentalRate: 2500000,
       seatCount: 500,
       rentalCapacityLabel: 'Kapasitas up to 500 kursi pementasan',
     ),
     const Facility(
-      id: 'panggung-terbuka',
+      id: 'panggung',
       number: 2,
-      name: 'Panggung Terbuka (Amphitheater)',
+      name: 'Panggung Terbuka',
       shortName: 'Panggung Terbuka',
       description:
           'Amfiteater ruang terbuka bernuansa alam untuk pertunjukan '
@@ -128,12 +128,12 @@ abstract final class DummyData {
       capacityLabel: 'Kapasitas up to 800 orang',
       imageAsset: AppImages.fasilitasPanggung,
       mapPosition: Offset(0.534, 0.213),
-      ratePerHour: 2500000,
+      rentalRate: 2000000,
       seatCount: 800,
       rentalCapacityLabel: 'Kapasitas up to 800 penonton',
     ),
     const Facility(
-      id: 'gedung-kesenian',
+      id: 'galeri',
       number: 3,
       name: 'Gedung Kesenian & Galeri',
       shortName: 'Gedung Kesenian',
@@ -143,12 +143,12 @@ abstract final class DummyData {
       capacityLabel: 'Kapasitas up to 200 orang',
       imageAsset: AppImages.fasilitasGedung,
       mapPosition: Offset(0.673, 0.629),
-      ratePerHour: 1500000,
+      rentalRate: 1500000,
       seatCount: 200,
       rentalCapacityLabel: 'Kapasitas up to 200 pameran',
     ),
     const Facility(
-      id: 'parkir-informasi',
+      id: 'loket',
       number: 4,
       name: 'Area Parkir & Pusat Informasi',
       shortName: 'Area Parkir',
@@ -161,15 +161,16 @@ abstract final class DummyData {
     ),
   ];
 
+  /// Akun demo: sama dengan akun contoh di backend/mobile-app (npm run seed).
   static const demoAccount = UserAccount(
     name: 'Budi Santoso',
     email: 'budi.santoso@email.com',
     phone: '081234567890',
-    password: 'tkbj2026',
     memberSince: 2026,
     city: 'Malang',
-    savedEvents: 5,
   );
+
+  static const demoPassword = 'tkbj2026';
 
   static List<TicketOrder> seedOrders() => [
     TicketOrder(
@@ -180,16 +181,66 @@ abstract final class DummyData {
         phone: demoAccount.phone,
       ),
       lines: [
-        CartLine(event: events[0], quantity: 2),
-        CartLine(event: events[1], quantity: 1),
+        CartLine(
+          event: events[0],
+          quantity: 2,
+          orderId: 'TK-0626-0101',
+          ticketCodes: const ['TK-0101-A', 'TK-0101-B'],
+        ),
+        CartLine(
+          event: events[1],
+          quantity: 1,
+          orderId: 'TK-0626-0102',
+          ticketCodes: const ['TK-0102-A'],
+        ),
       ],
+      createdAt: DateTime(2026, 6, 1),
+      status: PaymentStatus.paid,
       method: PaymentMethod.qris,
       paidAt: DateTime(2026, 6, 1),
     ),
   ];
 
+  static RentalRequest _rental({
+    required String code,
+    required Facility facility,
+    required String activityName,
+    required DateTime date,
+    required RentalSlot slot,
+    required String applicantName,
+    required String contact,
+    required int documentCount,
+    required DateTime submittedAt,
+    RentalStatus status = RentalStatus.pending,
+    PaymentStatus? payment,
+    DateTime? reviewedAt,
+    String? adminNote,
+    List<String> fixes = const [],
+    PaymentMethod? paymentMethod,
+  }) => RentalRequest(
+    code: code,
+    facility: facility,
+    activityName: activityName,
+    date: date,
+    slot: slot,
+    startTime: Formatters.hour(slot.startHour),
+    endTime: Formatters.hour(slot.endHour),
+    applicantName: applicantName,
+    contact: contact,
+    documentCount: documentCount,
+    submittedAt: submittedAt,
+    amount: facility.rentalRate ?? 0,
+    status: status,
+    payment: payment,
+    reviewedAt: reviewedAt,
+    adminNote: adminNote,
+    fixes: fixes,
+    paymentMethod: paymentMethod,
+    paidAt: status == RentalStatus.paid ? reviewedAt : null,
+  );
+
   static List<RentalRequest> seedRentals() => [
-    RentalRequest(
+    _rental(
       code: 'SG-1026-0020',
       facility: facilities[2],
       activityName: 'Pameran Kriya Muda Malang Raya',
@@ -200,7 +251,7 @@ abstract final class DummyData {
       documentCount: 3,
       submittedAt: DateTime(2026, 6, 2, 10, 5),
     ),
-    RentalRequest(
+    _rental(
       code: 'SG-1026-0019',
       facility: facilities[0],
       activityName: 'Festival Tari Topeng Malangan 2026',
@@ -211,10 +262,11 @@ abstract final class DummyData {
       documentCount: 3,
       submittedAt: DateTime(2026, 6, 1, 14, 20),
       status: RentalStatus.paid,
+      payment: PaymentStatus.paid,
       reviewedAt: DateTime(2026, 6, 2, 9, 12),
       paymentMethod: PaymentMethod.virtualAccount,
     ),
-    RentalRequest(
+    _rental(
       code: 'SG-1026-0012',
       facility: facilities[1],
       activityName: 'Malam Apresiasi Jaranan',
@@ -240,12 +292,5 @@ abstract final class DummyData {
   static const rejectionFixes = [
     'Ganti tanggal pelaksanaan',
     'Lampirkan rundown acara di proposal',
-  ];
-
-  /// Berkas wajib pada langkah Unggah Berkas sewa gedung.
-  static const rentalDocuments = [
-    'KTP Penanggung Jawab',
-    'Surat Permohonan Resmi',
-    'Proposal Kegiatan',
   ];
 }

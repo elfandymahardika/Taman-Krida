@@ -9,6 +9,7 @@ import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_card.dart';
 import '../../widgets/common/app_feedback.dart';
 import '../../widgets/common/pill_badge.dart';
+import '../../widgets/common/refresh_on_open.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
@@ -29,7 +30,7 @@ class AccountScreen extends StatelessWidget {
           AppButton(
             label: 'Ya, Keluar',
             onPressed: () {
-              AppStateScope.read(context).logout();
+              AppStateScope.read(context).logout().catchError((_) {});
               Navigator.of(sheetContext).pop();
               AppRoutes.goHome(context);
               showAppToast(context, 'Anda telah keluar dari akun.');
@@ -53,121 +54,136 @@ class AccountScreen extends StatelessWidget {
     // Sesi bisa berakhir (logout) saat layar ini masih di tumpukan.
     if (user == null) return const TkbjScaffold(children: []);
 
-    return TkbjScaffold(
-      children: [
-        PageHeader(
-          breadcrumb: 'Beranda / Akun Saya',
-          title: 'Akun Saya',
-          subtitle: 'Kelola tiket, pengajuan sewa, dan data profil Anda.',
-          onBreadcrumbTap: () => AppRoutes.goHome(context),
-        ),
-        ContentSection(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              AppCard(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: AppColors.maroon,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        Formatters.initials(user.name),
-                        style: AppText.playfair(18, color: AppColors.white),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            user.name,
-                            style: AppText.poppins(16, weight: FontWeight.w600),
-                          ),
-                          Text(
-                            user.email,
-                            style: AppText.poppins(12, color: AppColors.muted),
-                          ),
-                          const SizedBox(height: 6),
-                          PillBadge(
-                            'Anggota sejak ${user.memberSince}',
-                            fontSize: 10,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              AppCard(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Row(
-                  children: [
-                    _Stat(
-                      value: state.ticketLines.length,
-                      label: 'Tiket aktif',
-                    ),
-                    _Stat(value: state.rentals.length, label: 'Pengajuan sewa'),
-                    _Stat(value: user.savedEvents, label: 'Acara disimpan'),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              AccountMenuTile(
-                symbol: '🎟',
-                title: 'Tiket Saya',
-                subtitle: 'E-tiket pertunjukan yang sudah dibeli',
-                onTap: () => navigator.pushNamed(AppRoutes.myTickets),
-              ),
-              const SizedBox(height: 12),
-              AccountMenuTile(
-                symbol: '🏛',
-                title: 'Riwayat Sewa Gedung',
-                subtitle: 'Status pengajuan & bukti reservasi',
-                onTap: () => navigator.pushNamed(AppRoutes.rentalHistory),
-              ),
-              const SizedBox(height: 12),
-              AccountMenuTile(
-                symbol: '✎',
-                title: 'Edit Profil',
-                subtitle: 'Nama, email, dan nomor WhatsApp',
-                onTap: () => navigator.pushNamed(AppRoutes.editProfile),
-              ),
-              const SizedBox(height: 12),
-              AccountMenuTile(
-                symbol: '🔔',
-                title: 'Notifikasi',
-                subtitle: state.unreadCount > 0
-                    ? '${state.unreadCount} notifikasi belum dibaca'
-                    : 'Pengingat acara & status pengajuan',
-                onTap: () => navigator.pushNamed(AppRoutes.notifications),
-              ),
-              const SizedBox(height: 12),
-              AccountMenuTile(
-                symbol: '?',
-                title: 'Bantuan & Kontak',
-                subtitle: 'Hubungi pengelola TKBJ',
-                onTap: () => showAppToast(
-                  context,
-                  'Hubungi TKBJ: (0341) 123-456 · info@tkbj.jatimprov.go.id',
-                ),
-              ),
-              const SizedBox(height: 16),
-              AppButton.outline(
-                label: 'Keluar',
-                onPressed: () => _confirmLogout(context),
-              ),
-            ],
+    final activeTickets = state.ticketLines
+        .where((t) => t.order.isPaid)
+        .fold(0, (sum, t) => sum + t.line.quantity);
+
+    return RefreshOnOpen(
+      child: TkbjScaffold(
+        children: [
+          PageHeader(
+            breadcrumb: 'Beranda / Akun Saya',
+            title: 'Akun Saya',
+            subtitle: 'Kelola tiket, pengajuan sewa, dan data profil Anda.',
+            onBreadcrumbTap: () => AppRoutes.goHome(context),
           ),
-        ),
-      ],
+          ContentSection(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AppCard(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 60,
+                        height: 60,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(
+                          color: AppColors.maroon,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          Formatters.initials(user.name),
+                          style: AppText.playfair(18, color: AppColors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.name,
+                              style: AppText.poppins(
+                                16,
+                                weight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              user.email,
+                              style: AppText.poppins(
+                                12,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            PillBadge(
+                              'Anggota sejak ${user.memberSince}',
+                              fontSize: 10,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                AppCard(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      _Stat(value: activeTickets, label: 'Tiket aktif'),
+                      _Stat(
+                        value: state.rentals.length,
+                        label: 'Pengajuan sewa',
+                      ),
+                      _Stat(
+                        value: state.communityRegistrations.length,
+                        label: 'Komunitas didaftarkan',
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                AccountMenuTile(
+                  symbol: '🎟',
+                  title: 'Tiket Saya',
+                  subtitle: 'E-tiket pertunjukan yang sudah dibeli',
+                  onTap: () => navigator.pushNamed(AppRoutes.myTickets),
+                ),
+                const SizedBox(height: 12),
+                AccountMenuTile(
+                  symbol: '🏛',
+                  title: 'Riwayat Sewa Gedung',
+                  subtitle: 'Status pengajuan & bukti reservasi',
+                  onTap: () => navigator.pushNamed(AppRoutes.rentalHistory),
+                ),
+                const SizedBox(height: 12),
+                AccountMenuTile(
+                  symbol: '✎',
+                  title: 'Edit Profil',
+                  subtitle: 'Nama, email, dan nomor WhatsApp',
+                  onTap: () => navigator.pushNamed(AppRoutes.editProfile),
+                ),
+                const SizedBox(height: 12),
+                AccountMenuTile(
+                  symbol: '🔔',
+                  title: 'Notifikasi',
+                  subtitle: state.unreadCount > 0
+                      ? '${state.unreadCount} notifikasi belum dibaca'
+                      : 'Pengingat acara & status pengajuan',
+                  onTap: () => navigator.pushNamed(AppRoutes.notifications),
+                ),
+                const SizedBox(height: 12),
+                AccountMenuTile(
+                  symbol: '?',
+                  title: 'Bantuan & Kontak',
+                  subtitle: 'Hubungi pengelola TKBJ',
+                  onTap: () => showAppToast(
+                    context,
+                    'Hubungi TKBJ: (0341) 123-456 · info@tkbj.jatimprov.go.id',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                AppButton.outline(
+                  label: 'Keluar',
+                  onPressed: () => _confirmLogout(context),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -10,6 +10,8 @@ import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_card.dart';
 import '../../widgets/common/app_feedback.dart';
+import '../../widgets/common/load_status.dart';
+import '../../widgets/common/refresh_on_open.dart';
 import '../../widgets/common/pill_badge.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
@@ -31,6 +33,8 @@ class NotificationsScreen extends StatelessWidget {
           return;
         }
         navigator.pushNamed(switch (rental.status) {
+          RentalStatus.approved when rental.isVerifyingPayment =>
+            AppRoutes.rentalStatus,
           RentalStatus.approved => AppRoutes.rentalPayment,
           RentalStatus.paid => AppRoutes.rentalReceipt,
           RentalStatus.rejected => AppRoutes.rentalRejected,
@@ -42,7 +46,15 @@ class NotificationsScreen extends StatelessWidget {
           arguments: notification.targetId,
         );
       case NotificationTarget.tickets:
-        navigator.pushNamed(AppRoutes.myTickets);
+        final order = state.findOrder(notification.targetId ?? '');
+        if (order == null) {
+          navigator.pushNamed(AppRoutes.myTickets);
+        } else {
+          navigator.pushNamed(
+            AppRoutes.checkoutSuccess,
+            arguments: order.bookingCode,
+          );
+        }
       case NotificationTarget.communities:
         navigator.pushNamed(AppRoutes.communities);
       case NotificationTarget.calendar:
@@ -57,62 +69,75 @@ class NotificationsScreen extends StatelessWidget {
     final unread = state.unreadCount;
     final navigator = Navigator.of(context);
 
-    return TkbjScaffold(
-      children: [
-        PageHeader(
-          breadcrumb: 'Akun Saya / Notifikasi',
-          title: 'Notifikasi',
-          subtitle: 'Kabar terbaru dari pengelola TKBJ untuk akun Anda.',
-          onBreadcrumbTap: () => navigator.pop(),
-        ),
-        ContentSection(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text('Terbaru', style: AppText.playfair(18))),
-                  if (unread > 0)
-                    PillBadge(
-                      '$unread baru',
-                      fontSize: 10,
-                      color: AppColors.white,
-                      background: AppColors.maroon,
-                      weight: FontWeight.w600,
+    return RefreshOnOpen(
+      child: TkbjScaffold(
+        children: [
+          PageHeader(
+            breadcrumb: 'Akun Saya / Notifikasi',
+            title: 'Notifikasi',
+            subtitle: 'Kabar terbaru dari pengelola TKBJ untuk akun Anda.',
+            onBreadcrumbTap: () => navigator.pop(),
+          ),
+          ContentSection(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Terbaru', style: AppText.playfair(18)),
                     ),
+                    if (unread > 0)
+                      PillBadge(
+                        '$unread baru',
+                        fontSize: 10,
+                        color: AppColors.white,
+                        background: AppColors.maroon,
+                        weight: FontWeight.w600,
+                      ),
+                  ],
+                ),
+                if (notifications.isEmpty) ...[
+                  const SizedBox(height: 16),
+                  LoadStatus(
+                    loading: state.accountLoading,
+                    error: state.accountLoading
+                        ? null
+                        : 'Belum ada notifikasi.',
+                  ),
                 ],
-              ),
-              for (final notification in notifications) ...[
+                for (final notification in notifications) ...[
+                  const SizedBox(height: 16),
+                  _NotificationCard(
+                    notification: notification,
+                    onTap: () => _open(context, notification),
+                  ),
+                ],
                 const SizedBox(height: 16),
-                _NotificationCard(
-                  notification: notification,
-                  onTap: () => _open(context, notification),
+                AppButton.outline(
+                  label: 'Tandai Semua Sudah Dibaca',
+                  onPressed: unread == 0
+                      ? null
+                      : () {
+                          state.markAllNotificationsRead();
+                          showAppToast(
+                            context,
+                            'Semua notifikasi ditandai sudah dibaca.',
+                          );
+                        },
+                ),
+                const SizedBox(height: 16),
+                AppButton.outline(
+                  label: '← Kembali ke Akun',
+                  onPressed: () =>
+                      AppRoutes.openFromHome(context, AppRoutes.account),
                 ),
               ],
-              const SizedBox(height: 16),
-              AppButton.outline(
-                label: 'Tandai Semua Sudah Dibaca',
-                onPressed: unread == 0
-                    ? null
-                    : () {
-                        state.markAllNotificationsRead();
-                        showAppToast(
-                          context,
-                          'Semua notifikasi ditandai sudah dibaca.',
-                        );
-                      },
-              ),
-              const SizedBox(height: 16),
-              AppButton.outline(
-                label: '← Kembali ke Akun',
-                onPressed: () =>
-                    AppRoutes.openFromHome(context, AppRoutes.account),
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

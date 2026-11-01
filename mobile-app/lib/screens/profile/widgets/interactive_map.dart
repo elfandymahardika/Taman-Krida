@@ -34,15 +34,16 @@ class InteractiveMap extends StatelessWidget {
           return Stack(
             children: [
               for (final facility in facilities)
-                Positioned(
-                  left: facility.mapPosition.dx * width - _pinSize / 2,
-                  top: facility.mapPosition.dy * height - _pinSize / 2,
-                  child: _MapPin(
-                    number: facility.number,
-                    label: facility.name,
-                    onTap: () => onPinTap(facility),
+                if (facility.mapPosition case final position?)
+                  Positioned(
+                    left: position.dx * width - _pinSize / 2,
+                    top: position.dy * height - _pinSize / 2,
+                    child: _MapPin(
+                      number: facility.number,
+                      label: facility.name,
+                      onTap: () => onPinTap(facility),
+                    ),
                   ),
-                ),
             ],
           );
         },

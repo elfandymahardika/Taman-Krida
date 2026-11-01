@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../data/dummy/dummy_data.dart';
+import '../../state/app_state.dart';
 import '../../data/models/facility.dart';
 import '../../routes/app_routes.dart';
 import '../../widgets/layout/content_section.dart';
@@ -23,7 +23,7 @@ class ProfileMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final facilities = DummyData.facilities;
+    final facilities = AppStateScope.of(context).facilities;
 
     return TkbjScaffold(
       children: [

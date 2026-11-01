@@ -35,9 +35,17 @@ class _RentalScheduleScreenState extends State<RentalScheduleScreen> {
     super.didChangeDependencies();
     if (_initialized) return;
     _initialized = true;
-    final start =
-        AppStateScope.read(context).rentalDraft.date ?? DateTime.now();
+    final state = AppStateScope.read(context);
+    final start = state.rentalDraft.date ?? state.today;
     _month = DateTime(start.year, start.month);
+    _load();
+  }
+
+  /// Ambil ketersediaan bulan yang tampil dari server.
+  void _load() {
+    final state = AppStateScope.read(context);
+    final facility = state.rentalDraft.facility;
+    if (facility != null) state.loadAvailability(facility, _month);
   }
 
   DayStatus _statusOf(AppState state, Facility facility, DateTime day) {
@@ -125,13 +133,23 @@ class _RentalScheduleScreenState extends State<RentalScheduleScreen> {
                       selected: draft.date,
                       statusOf: (day) => _statusOf(state, facility, day),
                       onDayTap: (day) => _onDayTap(state, facility, day),
-                      onMonthChanged: (delta) => setState(
-                        () => _month = DateTime(
-                          _month.year,
-                          _month.month + delta,
-                        ),
-                      ),
+                      onMonthChanged: (delta) {
+                        setState(
+                          () => _month = DateTime(
+                            _month.year,
+                            _month.month + delta,
+                          ),
+                        );
+                        _load();
+                      },
                     ),
+                    if (state.isAvailabilityLoading(facility, _month)) ...[
+                      const SizedBox(height: 8),
+                      const LinearProgressIndicator(
+                        color: AppColors.maroon,
+                        backgroundColor: AppColors.goldTint,
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     if (draft.date == null)
                       Text(
@@ -216,8 +234,9 @@ class _SelectedVenue extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${Formatters.rupiahShort(facility.ratePerHour!)} / jam · '
-                    '${facility.seatCount} kursi',
+                    '${Formatters.rupiahShort(facility.rentalRate ?? 0)} / '
+                    'pemakaian'
+                    '${facility.seatCount == null ? '' : ' · ${facility.seatCount} kursi'}',
                     style: AppText.poppins(11, color: AppColors.muted),
                   ),
                 ],

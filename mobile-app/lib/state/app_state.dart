@@ -1,111 +1,231 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 
+import '../core/utils/file_pick.dart';
 import '../core/utils/formatters.dart';
-import '../data/dummy/dummy_data.dart';
-import '../data/dummy/notification_data.dart';
+import '../data/api/api_client.dart';
 import '../data/models/app_notification.dart';
 import '../data/models/community.dart';
 import '../data/models/cultural_event.dart';
 import '../data/models/facility.dart';
+import '../data/models/gallery_item.dart';
 import '../data/models/rental_request.dart';
 import '../data/models/ticket_order.dart';
 import '../data/models/user_account.dart';
+import '../data/repository/demo_repository.dart';
+import '../data/repository/tkbj_repository.dart';
 
-/// State aplikasi: sesi login, keranjang tiket, pesanan, pengajuan sewa,
-/// pendaftaran komunitas, dan notifikasi.
-/// Disimpan di memori: data kembali ke kondisi awal saat aplikasi ditutup.
+/// Keadaan pemuatan data dari server.
+enum LoadState { idle, loading, ready, error }
+
+/// State aplikasi: data publik (acara, fasilitas, komunitas, galeri), sesi
+/// login, keranjang tiket, pesanan, pengajuan sewa, pendaftaran komunitas,
+/// dan notifikasi. Data diambil & disimpan lewat [repository]
+/// (API backend/mobile-app, atau data contoh pada mode demo/test).
 class AppState extends ChangeNotifier {
-  AppState()
-    : _accounts = [DummyData.demoAccount],
-      _orders = DummyData.seedOrders(),
-      _rentals = DummyData.seedRentals(),
-      _notifications = NotificationData.seed(DateTime.now());
+  AppState({TkbjRepository? repository, FilePick? pickFile})
+    : repository = repository ?? TkbjRepository.fromEnvironment(),
+      pickFile = pickFile ?? pickWithSystemPicker;
 
+  final TkbjRepository repository;
+
+  /// Pemilih berkas (dokumen sewa, bukti transfer).
+  final FilePick pickFile;
+
+  /// Batas tiket per acara di aplikasi (server mengizinkan hingga batas
+  /// Pengaturan dashboard, mana yang lebih kecil).
   static const maxTicketsPerEvent = 4;
 
-  final _random = Random();
+  /// Mode demo tanpa server: keputusan admin bisa disimulasikan.
+  bool get canSimulateAdmin => repository is DemoRepository;
+
+  Future<void>? _init;
+
+  /// Muat data publik lalu pulihkan sesi login. Aman dipanggil berulang.
+  Future<void> init() => _init ??= _bootstrap();
+
+  Future<void> _bootstrap() async {
+    await loadCatalog();
+    try {
+      final user = await repository.restoreSession();
+      if (user != null) {
+        _currentUser = user;
+        notifyListeners();
+        await refreshAccount();
+      }
+    } on ApiException {
+      // Server tidak bisa dihubungi: tetap jalan sebagai tamu.
+    }
+  }
+
+  // ---------------------------------------------------------- Data publik
+
+  LoadState catalogState = LoadState.idle;
+  String? catalogError;
+  AppMeta? _meta;
+
+  List<CulturalEvent> events = const [];
+  List<Facility> facilities = const [];
+  List<Community> communities = const [];
+  List<GalleryItem> gallery = const [];
+
+  /// "Hari ini" versi server (data contoh memakai tanggal tetap).
+  DateTime get today => _meta?.today ?? DateUtils.dateOnly(DateTime.now());
+
+  List<String> get eventCategories => _meta?.eventCategories ?? const ['Semua'];
+  List<String> get communityCategories =>
+      _meta?.communityCategories ?? const [];
+  int get payDeadlineHours => _meta?.payDeadlineHours ?? 24;
+  String get bankName => _meta?.bank ?? '-';
+  String get bankAccount => _meta?.account ?? '-';
+
+  Future<void> loadCatalog() async {
+    catalogState = LoadState.loading;
+    catalogError = null;
+    notifyListeners();
+    try {
+      final meta = await repository.meta();
+      final results = await Future.wait([
+        repository.events(),
+        repository.facilities(),
+        repository.communities(),
+        repository.gallery(),
+      ]);
+      _meta = meta;
+      events = results[0] as List<CulturalEvent>;
+      facilities = results[1] as List<Facility>;
+      communities = results[2] as List<Community>;
+      gallery = results[3] as List<GalleryItem>;
+      catalogState = LoadState.ready;
+    } on ApiException catch (e) {
+      catalogState = LoadState.error;
+      catalogError = e.message;
+    }
+    notifyListeners();
+  }
+
+  CulturalEvent? eventById(String id) => _find(events, (e) => e.id == id);
+
+  Community? communityById(String id) => _find(communities, (c) => c.id == id);
+
+  GalleryItem? galleryById(String id) => _find(gallery, (g) => g.id == id);
+
+  Facility? facilityById(String id) => _find(facilities, (f) => f.id == id);
+
+  List<Facility> get rentableFacilities =>
+      facilities.where((f) => f.isRentable).toList();
+
+  /// Acara bertiket yang belum berlangsung (bisa dipesan).
+  List<CulturalEvent> get ticketedEvents =>
+      events.where((e) => e.isTicketed && !e.date.isBefore(today)).toList();
+
+  static T? _find<T>(List<T> items, bool Function(T) test) {
+    for (final item in items) {
+      if (test(item)) return item;
+    }
+    return null;
+  }
 
   // ---------------------------------------------------------------- Akun
 
-  final List<UserAccount> _accounts;
   UserAccount? _currentUser;
 
   UserAccount? get currentUser => _currentUser;
   bool get isLoggedIn => _currentUser != null;
 
-  UserAccount? _findAccount(String email) {
-    final key = email.trim().toLowerCase();
-    for (final account in _accounts) {
-      if (account.email.toLowerCase() == key) return account;
-    }
-    return null;
-  }
-
   /// Mengembalikan pesan error, atau `null` jika login berhasil.
-  String? login(String email, String password) {
-    final account = _findAccount(email);
-    if (account == null) {
-      return 'Email belum terdaftar. Silakan daftar akun baru.';
-    }
-    if (account.password != password) {
-      return 'Kata sandi salah. Periksa kembali kata sandi Anda.';
-    }
-    _currentUser = account;
-    notifyListeners();
-    return null;
-  }
+  Future<String?> login(String email, String password) =>
+      _signIn(() => repository.login(email, password));
 
   /// Mendaftarkan akun baru lalu langsung login.
-  String? register({
+  Future<String?> register({
     required String name,
     required String email,
     required String phone,
     required String password,
-  }) {
-    if (_findAccount(email) != null) {
-      return 'Email sudah terdaftar. Silakan masuk.';
-    }
-    final account = UserAccount(
+  }) => _signIn(
+    () => repository.register(
       name: name.trim(),
       email: email.trim(),
       phone: phone.trim(),
       password: password,
-      memberSince: DateTime.now().year,
-    );
-    _accounts.add(account);
-    _currentUser = account;
+    ),
+  );
+
+  Future<String?> _signIn(Future<UserAccount> Function() call) async {
+    try {
+      _currentUser = await call();
+    } on ApiException catch (e) {
+      return e.displayMessage;
+    }
     notifyListeners();
+    await refreshAccount();
     return null;
   }
 
-  String? updateProfile({
+  Future<String?> updateProfile({
     required String name,
     required String email,
     required String phone,
     required String city,
-  }) {
-    final current = _currentUser;
-    if (current == null) return 'Silakan masuk terlebih dahulu.';
-    final owner = _findAccount(email);
-    if (owner != null && owner != current) {
-      return 'Email sudah dipakai akun lain.';
+  }) async {
+    try {
+      _currentUser = await repository.updateProfile(
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        city: city.trim(),
+      );
+    } on ApiException catch (e) {
+      return e.displayMessage;
     }
-    final updated = current.copyWith(
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      city: city.trim(),
-    );
-    _accounts[_accounts.indexOf(current)] = updated;
-    _currentUser = updated;
     notifyListeners();
     return null;
   }
 
-  void logout() {
+  Future<void> logout() async {
+    await repository.logout();
+    _clearAccount();
+  }
+
+  void _clearAccount() {
     _currentUser = null;
+    _orders = [];
+    _rentals = [];
+    _registrations = [];
+    _notifications = [];
+    _buyer = null;
+    notifyListeners();
+  }
+
+  // ------------------------------------------------- Data milik akun
+
+  bool accountLoading = false;
+
+  /// Muat ulang tiket, sewa, komunitas, dan notifikasi milik akun. Keputusan
+  /// admin terbaru (lunas, disetujui, ditolak) ikut terbawa.
+  Future<void> refreshAccount() async {
+    if (!isLoggedIn) return;
+    accountLoading = true;
+    notifyListeners();
+    try {
+      // Notifikasi dulu: server menyinkronkan keputusan admin saat dibaca.
+      _notifications = await repository.notifications();
+      final results = await Future.wait([
+        repository.bookings(),
+        repository.rentals(),
+        repository.myCommunities(),
+      ]);
+      _orders = results[0] as List<TicketOrder>;
+      _rentals = results[1] as List<RentalRequest>;
+      _registrations = results[2] as List<CommunityRegistration>;
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        accountLoading = false;
+        _clearAccount();
+        return;
+      }
+    }
+    accountLoading = false;
     notifyListeners();
   }
 
@@ -131,14 +251,14 @@ class AppState extends ChangeNotifier {
   }
 
   List<CartLine> get cartLines => [
-    for (final event in DummyData.events)
+    for (final event in events)
       if (quantityOf(event.id) > 0)
         CartLine(event: event, quantity: quantityOf(event.id)),
   ];
 
   int get cartTotal => cartLines.fold(0, (sum, line) => sum + line.subtotal);
 
-  bool get isCartEmpty => _cart.isEmpty;
+  bool get isCartEmpty => cartLines.isEmpty;
 
   // ------------------------------------------------------------- Checkout
 
@@ -158,7 +278,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  final List<TicketOrder> _orders;
+  List<TicketOrder> _orders = [];
 
   List<TicketOrder> get orders => List.unmodifiable(_orders);
 
@@ -168,54 +288,77 @@ class AppState extends ChangeNotifier {
       for (final line in order.lines) (order: order, line: line),
   ];
 
-  /// Menyelesaikan pembayaran (simulasi) dan mengosongkan keranjang.
-  TicketOrder placeOrder() {
+  TicketOrder? findOrder(String bookingCode) =>
+      _find(_orders, (o) => o.bookingCode == bookingCode);
+
+  void _putOrder(TicketOrder order) {
+    _orders = [
+      order,
+      for (final o in _orders)
+        if (o.bookingCode != order.bookingCode) o,
+    ];
+  }
+
+  /// Buat pesanan dari keranjang (status "Menunggu pembayaran") lalu
+  /// kosongkan keranjang. Melempar [ApiException] bila ditolak server
+  /// (mis. kuota habis).
+  Future<TicketOrder> placeOrder() async {
     final buyer = _buyer;
     if (buyer == null || isCartEmpty) {
       throw StateError('Data pemesan atau keranjang belum lengkap.');
     }
-    final order = TicketOrder(
-      bookingCode: 'TKBJ-${_randomCode(6)}',
-      buyer: buyer,
-      lines: cartLines,
-      method: _paymentMethod,
-      paidAt: DateTime.now(),
-    );
-    _orders.insert(0, order);
+    final order = await repository.checkout(cartLines, buyer);
+    _putOrder(order);
     _cart.clear();
-    final ticketCount = order.lines.fold(0, (sum, l) => sum + l.quantity);
-    _notify(
-      symbol: '🎟',
-      title: 'E-tiket telah terbit',
-      body:
-          'Kode ${order.bookingCode} untuk $ticketCount tiket sudah tersedia '
-          'di Tiket Saya.',
-      target: NotificationTarget.tickets,
-    );
+    notifyListeners();
+    _refreshQuietly();
     return order;
   }
 
-  TicketOrder? findOrder(String bookingCode) {
-    for (final order in _orders) {
-      if (order.bookingCode == bookingCode) return order;
+  /// Unggah bukti pembayaran → "Sedang diverifikasi" admin.
+  Future<TicketOrder> payBooking(
+    String code,
+    PaymentMethod method,
+    UploadedFile proof,
+    String sender,
+  ) async {
+    final order = await repository.payBooking(code, method, proof, sender);
+    _putOrder(order);
+    notifyListeners();
+    return order;
+  }
+
+  /// Muat ulang data publik (kuota) & notifikasi tanpa mengganggu layar.
+  void _refreshQuietly() {
+    repository.events().then((list) {
+      events = list;
+      notifyListeners();
+    }, onError: (_) {});
+    if (isLoggedIn) {
+      repository.notifications().then((list) {
+        _notifications = list;
+        notifyListeners();
+      }, onError: (_) {});
     }
-    return null;
   }
 
   // ---------------------------------------------------------- Sewa gedung
 
-  final List<RentalRequest> _rentals;
+  List<RentalRequest> _rentals = [];
   RentalDraft _rentalDraft = RentalDraft();
-  int _nextRentalNumber = 21;
 
   List<RentalRequest> get rentals => List.unmodifiable(_rentals);
   RentalDraft get rentalDraft => _rentalDraft;
 
-  RentalRequest? findRental(String code) {
-    for (final rental in _rentals) {
-      if (rental.code == code) return rental;
-    }
-    return null;
+  RentalRequest? findRental(String code) =>
+      _find(_rentals, (r) => r.code == code);
+
+  void _putRental(RentalRequest rental) {
+    _rentals = [
+      rental,
+      for (final r in _rentals)
+        if (r.code != rental.code) r,
+    ];
   }
 
   /// Memulai pengajuan baru (langkah 1). [facility] dari denah/ajukan ulang.
@@ -263,204 +406,134 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Simulasi unggah berkas: nama file dibuat dari jenis dokumen.
-  void attachRentalDocument(String label) {
-    final slug = label.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '_');
-    _rentalDraft.documents[label] = UploadedFile(
-      fileName: '$slug.pdf',
-      sizeLabel: '${(_random.nextInt(18) + 4) * 100} KB',
-      type: 'PDF',
-    );
+  /// Simpan berkas yang dipilih untuk dokumen [key] (ktp/surat/proposal).
+  void attachRentalDocument(String key, UploadedFile file) {
+    _rentalDraft.documents[key] = file;
     notifyListeners();
   }
 
-  bool _isPast(DateTime date) =>
-      DateUtils.dateOnly(date).isBefore(DateUtils.dateOnly(DateTime.now()));
+  // Kalender ketersediaan per venue & bulan, dimuat dari server.
+  final Map<String, Availability> _availability = {};
+  final Set<String> _availabilityLoading = {};
 
-  /// Slot dianggap penuh jika dipakai agenda lain (simulasi deterministik)
-  /// atau oleh pengajuan sewa yang masih berlaku.
-  bool isSlotTaken(Facility facility, DateTime date, RentalSlot slot) {
-    final agenda = (date.day + facility.number + slot.index) % 3 == 0;
-    return agenda ||
-        _rentals.any(
-          (r) =>
-              r.holdsSchedule &&
-              r.facility.id == facility.id &&
-              r.slot == slot &&
-              DateUtils.isSameDay(r.date, date),
-        );
+  String _availabilityKey(Facility facility, DateTime month) =>
+      '${facility.id}|${month.year}-${month.month}';
+
+  bool isAvailabilityLoading(Facility facility, DateTime month) =>
+      _availabilityLoading.contains(_availabilityKey(facility, month));
+
+  /// Muat ketersediaan satu bulan (sekali, kecuali [force]).
+  Future<void> loadAvailability(
+    Facility facility,
+    DateTime month, {
+    bool force = false,
+  }) async {
+    final key = _availabilityKey(facility, month);
+    if (_availabilityLoading.contains(key)) return;
+    if (!force && _availability.containsKey(key)) return;
+    _availabilityLoading.add(key);
+    notifyListeners();
+    try {
+      _availability[key] = await repository.availability(facility, month);
+    } on ApiException {
+      // Kalender tetap bisa dipakai; server menolak slot penuh saat dikirim.
+    }
+    _availabilityLoading.remove(key);
+    notifyListeners();
   }
 
-  /// Tanggal penuh: ada agenda sehari penuh atau semua slot terpakai.
-  bool isDateFull(Facility facility, DateTime date) {
-    final fullDayAgenda =
-        (date.day + facility.number * 2 + date.month) % 7 == 0;
-    return fullDayAgenda ||
-        RentalSlot.values.every((slot) => isSlotTaken(facility, date, slot));
+  SlotState slotState(Facility facility, DateTime date, RentalSlot slot) {
+    if (isDatePast(date)) return SlotState.past;
+    final month = _availability[_availabilityKey(facility, date)];
+    return month?[Formatters.isoDate(date)]?[slot] ?? SlotState.available;
   }
 
-  bool isDatePast(DateTime date) => _isPast(date);
+  /// Slot dipakai acara atau pengajuan sewa lain.
+  bool isSlotTaken(Facility facility, DateTime date, RentalSlot slot) =>
+      slotState(facility, date, slot) == SlotState.full;
 
-  RentalRequest submitRental() {
+  /// Tanggal penuh: semua slot terpakai.
+  bool isDateFull(Facility facility, DateTime date) =>
+      RentalSlot.values.every((slot) => isSlotTaken(facility, date, slot));
+
+  bool isDatePast(DateTime date) => DateUtils.dateOnly(date).isBefore(today);
+
+  /// Kirim pengajuan + 3 berkas. Melempar [ApiException] bila ditolak
+  /// (mis. slot baru saja diambil orang lain).
+  Future<RentalRequest> submitRental() async {
     final draft = _rentalDraft;
     if (draft.facility == null || draft.date == null || draft.slot == null) {
       throw StateError('Venue, tanggal, dan slot belum dipilih.');
     }
-    final now = DateTime.now();
-    final request = RentalRequest(
-      code:
-          'SG-${Formatters.twoDigits(now.month)}${now.year % 100}-'
-          '${(_nextRentalNumber++).toString().padLeft(4, '0')}',
-      facility: draft.facility!,
-      activityName: draft.activityName,
-      date: draft.date!,
-      slot: draft.slot!,
-      applicantName: draft.applicantName,
-      contact: draft.contact,
-      documentCount: draft.documents.length,
-      submittedAt: now,
+    final request = await repository.submitRental(draft);
+    _putRental(request);
+    _availability.removeWhere(
+      (key, _) => key.startsWith('${draft.facility!.id}|'),
     );
-    _rentals.insert(0, request);
     _rentalDraft = RentalDraft();
     notifyListeners();
+    _refreshQuietly();
     return request;
   }
 
-  void _replaceRental(RentalRequest updated) {
-    final index = _rentals.indexWhere((r) => r.code == updated.code);
-    _rentals[index] = updated;
+  /// Unggah bukti pembayaran tagihan sewa → "Sedang diverifikasi".
+  Future<RentalRequest> payRental(
+    String code,
+    PaymentMethod method,
+    UploadedFile proof,
+    String sender,
+  ) async {
+    final rental = await repository.payRental(code, method, proof, sender);
+    _putRental(rental);
+    notifyListeners();
+    return rental;
   }
 
-  /// Simulasi keputusan admin: disetujui.
-  void approveRental(String code) {
-    final rental = findRental(code)!;
-    _replaceRental(
-      rental.copyWith(
-        status: RentalStatus.approved,
-        reviewedAt: DateTime.now(),
-      ),
-    );
-    _notify(
-      symbol: '✅',
-      title: 'Pengajuan sewa disetujui',
-      body:
-          '$code · ${rental.facility.name} disetujui admin. Selesaikan '
-          'pembayaran dalam 2×24 jam.',
-      target: NotificationTarget.rental,
-      targetId: code,
-    );
-  }
-
-  /// Simulasi keputusan admin: ditolak beserta catatan.
-  void rejectRental(String code) {
-    final rental = findRental(code)!;
-    _replaceRental(
-      rental.copyWith(
-        status: RentalStatus.rejected,
-        reviewedAt: DateTime.now(),
-        adminNote: DummyData.rejectionNote(rental.date),
-        fixes: DummyData.rejectionFixes,
-      ),
-    );
-    _notify(
-      symbol: '❌',
-      title: 'Pengajuan sewa ditolak',
-      body: '$code ditolak admin. Lihat catatan dan ajukan ulang.',
-      target: NotificationTarget.rental,
-      targetId: code,
-    );
-  }
-
-  void payRental(String code, PaymentMethod method) {
-    final rental = findRental(code)!;
-    _replaceRental(
-      rental.copyWith(status: RentalStatus.paid, paymentMethod: method),
-    );
-    _notify(
-      symbol: '🧾',
-      title: 'Pembayaran sewa diterima',
-      body:
-          'Bukti reservasi $code untuk ${rental.facility.name} telah '
-          'diterbitkan.',
-      target: NotificationTarget.rental,
-      targetId: code,
-    );
+  /// Mode demo saja: simulasi keputusan admin di dashboard.
+  Future<void> simulateAdmin(void Function(DemoRepository demo) decide) async {
+    final demo = repository;
+    if (demo is! DemoRepository) return;
+    decide(demo);
+    await refreshAccount();
   }
 
   // ------------------------------------------------------------ Komunitas
 
-  final List<CommunityRegistration> _communityRegistrations = [];
+  List<CommunityRegistration> _registrations = [];
 
   List<CommunityRegistration> get communityRegistrations =>
-      List.unmodifiable(_communityRegistrations);
+      List.unmodifiable(_registrations);
 
-  void registerCommunity(CommunityRegistration registration) {
-    _communityRegistrations.insert(0, registration);
-    _notify(
-      symbol: '👥',
-      title: 'Pendaftaran komunitas ditinjau',
-      body:
-          'Data ${registration.name} sedang diverifikasi admin '
-          '(1–3 hari kerja).',
-      target: NotificationTarget.communities,
-    );
+  /// Kirim pendaftaran → menunggu persetujuan admin. Melempar [ApiException].
+  Future<void> registerCommunity(CommunityRegistration registration) async {
+    final saved = await repository.registerCommunity(registration);
+    _registrations = [saved, ..._registrations];
+    notifyListeners();
+    _refreshQuietly();
   }
 
   // ----------------------------------------------------------- Notifikasi
 
-  final List<AppNotification> _notifications;
-  int _notificationSeq = 100;
+  List<AppNotification> _notifications = [];
 
   List<AppNotification> get notifications => List.unmodifiable(_notifications);
 
   int get unreadCount => _notifications.where((n) => !n.read).length;
 
-  void _notify({
-    required String symbol,
-    required String title,
-    required String body,
-    required NotificationTarget target,
-    String? targetId,
-  }) {
-    _notifications.insert(
-      0,
-      AppNotification(
-        id: 'n${_notificationSeq++}',
-        symbol: symbol,
-        title: title,
-        body: body,
-        createdAt: DateTime.now(),
-        target: target,
-        targetId: targetId,
-      ),
-    );
-    notifyListeners();
-  }
-
   void markNotificationRead(String id) {
     final index = _notifications.indexWhere((n) => n.id == id);
     if (index < 0 || _notifications[index].read) return;
-    _notifications[index] = _notifications[index].markRead();
+    _notifications = List.of(_notifications)
+      ..[index] = _notifications[index].markRead();
     notifyListeners();
+    repository.markNotificationRead(id).catchError((_) {});
   }
 
   void markAllNotificationsRead() {
-    for (var i = 0; i < _notifications.length; i++) {
-      _notifications[i] = _notifications[i].markRead();
-    }
+    _notifications = [for (final n in _notifications) n.markRead()];
     notifyListeners();
+    repository.markAllNotificationsRead().catchError((_) {});
   }
-
-  String _randomCode(int length) {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    return List.generate(
-      length,
-      (_) => chars[_random.nextInt(chars.length)],
-    ).join();
-  }
-
-  CulturalEvent eventById(String id) =>
-      DummyData.events.firstWhere((event) => event.id == id);
 }
 
 /// Menyediakan [AppState] ke seluruh widget di bawahnya dan me-rebuild

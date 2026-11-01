@@ -12,12 +12,18 @@ class ETicketCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final codes = [for (final line in order.lines) ...line.ticketCodes];
     return ReceiptCard(
       title: 'E-Tiket Resmi TKBJ',
       rows: [
         ReceiptRow('Pemesan', order.buyer.name),
-        ReceiptRow('Tanggal', Formatters.longDate(order.paidAt)),
+        ReceiptRow(
+          'Tanggal',
+          Formatters.longDate(order.paidAt ?? order.createdAt),
+        ),
         ReceiptRow('Item Pertunjukan', order.itemsSummary, stacked: true),
+        if (codes.isNotEmpty)
+          ReceiptRow('Kode Tiket', codes.join(', '), stacked: true),
       ],
       codeLabel: 'Kode Booking E-Tiket Anda',
       code: order.bookingCode,

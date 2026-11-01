@@ -43,6 +43,16 @@ abstract final class Validators {
     if (value!.length < minLength) {
       return 'Kata sandi minimal $minLength karakter.';
     }
+    // Sama dengan aturan server (backend/mobile-app lib/validatePassword.ts).
+    if (!RegExp('[A-Z]').hasMatch(value)) {
+      return 'Kata sandi harus memuat huruf besar.';
+    }
+    if (!RegExp('[a-z]').hasMatch(value)) {
+      return 'Kata sandi harus memuat huruf kecil.';
+    }
+    if (!RegExp(r'\d').hasMatch(value)) {
+      return 'Kata sandi harus memuat angka.';
+    }
     return null;
   }
 }

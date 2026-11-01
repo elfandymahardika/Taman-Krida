@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/formatters.dart';
-import '../../data/dummy/dummy_data.dart';
+import '../../state/app_state.dart';
 import '../../routes/app_routes.dart';
 import '../../widgets/common/app_feedback.dart';
+import '../../widgets/common/load_status.dart';
 import '../../widgets/interactive/chip_filter.dart';
 import '../../widgets/interactive/chip_filter_bar.dart';
 import '../../widgets/layout/content_section.dart';
@@ -24,14 +25,16 @@ class EventCalendarScreen extends StatefulWidget {
 }
 
 class _EventCalendarScreenState extends State<EventCalendarScreen> {
-  /// Bulan awal mengikuti desain: Juni 2026.
-  DateTime _month = DateTime(2026, 6);
-  String _category = DummyData.eventCategories.first;
+  /// Bulan awal = bulan "hari ini" server (diisi saat layar pertama dibuka).
+  DateTime? _month;
+  String _category = 'Semua';
   EventRange _range = EventRange.month;
+
+  DateTime get month => _month ?? DateTime(2026, 6);
 
   void _shiftMonth(int delta) {
     setState(() {
-      _month = DateTime(_month.year, _month.month + delta);
+      _month = DateTime(month.year, month.month + delta);
       if (_range == EventRange.week) _range = EventRange.month;
     });
   }
@@ -42,23 +45,22 @@ class _EventCalendarScreenState extends State<EventCalendarScreen> {
     setState(() {
       _range = picked;
       if (picked == EventRange.week) {
-        final now = DateTime.now();
-        _month = DateTime(now.year, now.month);
+        final today = AppStateScope.read(context).today;
+        _month = DateTime(today.year, today.month);
       }
     });
     showAppToast(context, 'Filter diterapkan: ${picked.label}.');
   }
 
-  bool _inRange(DateTime date) {
+  bool _inRange(DateTime date, DateTime today) {
     switch (_range) {
       case EventRange.month:
-        return date.year == _month.year && date.month == _month.month;
+        return date.year == month.year && date.month == month.month;
       case EventRange.weekend:
-        return date.year == _month.year &&
-            date.month == _month.month &&
+        return date.year == month.year &&
+            date.month == month.month &&
             date.weekday >= DateTime.saturday;
       case EventRange.week:
-        final today = DateUtils.dateOnly(DateTime.now());
         final monday = today.subtract(Duration(days: today.weekday - 1));
         return !date.isBefore(monday) &&
             date.isBefore(monday.add(const Duration(days: 7)));
@@ -67,12 +69,20 @@ class _EventCalendarScreenState extends State<EventCalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final events = DummyData.events.where((event) {
+    final state = AppStateScope.of(context);
+    if (_month == null && state.catalogState == LoadState.ready) {
+      _month = DateTime(state.today.year, state.today.month);
+    }
+    final categories = state.eventCategories;
+    final events = state.events.where((event) {
       final matchCategory =
-          _category == DummyData.eventCategories.first ||
-          event.category == _category;
-      return _inRange(event.date) && matchCategory;
+          _category == categories.first || event.category == _category;
+      return _inRange(event.date, state.today) && matchCategory;
     }).toList();
+    final loaded = state.catalogState == LoadState.ready;
+    final period = _range == EventRange.week
+        ? 'pekan ini'
+        : Formatters.monthYear(month);
 
     return TkbjScaffold(
       children: [
@@ -93,7 +103,7 @@ class _EventCalendarScreenState extends State<EventCalendarScreen> {
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
-                  Formatters.monthYear(_month),
+                  Formatters.monthYear(month),
                   style: AppText.playfair(16),
                 ),
               ),
@@ -113,18 +123,16 @@ class _EventCalendarScreenState extends State<EventCalendarScreen> {
         ContentSection(
           padding: const EdgeInsets.only(top: 12),
           child: ChipFilterBar(
-            options: DummyData.eventCategories,
+            options: categories,
             selected: _category,
             onSelected: (category) => setState(() => _category = category),
           ),
         ),
         ContentSection(
-          child: events.isEmpty
-              ? _EmptyState(
-                  period: _range == EventRange.week
-                      ? 'pekan ini'
-                      : Formatters.monthYear(_month),
-                )
+          child: !loaded
+              ? LoadStatus.catalog(state)
+              : events.isEmpty
+              ? _EmptyState(period: period)
               : ResponsiveGrid(
                   children: [
                     for (final event in events)

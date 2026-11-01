@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../data/dummy/dummy_data.dart';
+import '../../core/utils/file_pick.dart';
+import '../../data/api/api_client.dart';
 import '../../data/models/rental_request.dart';
 import '../../routes/app_routes.dart';
 import '../../state/app_state.dart';
@@ -28,29 +29,46 @@ class RentalDocumentsScreen extends StatefulWidget {
 class _RentalDocumentsScreenState extends State<RentalDocumentsScreen> {
   bool _agreed = false;
   bool _submitted = false;
+  bool _busy = false;
 
   /// Pengajuan yang baru dikirim (draft sudah dikosongkan oleh state).
   RentalRequest? _sent;
 
-  void _pick(String label) {
-    AppStateScope.read(context).attachRentalDocument(label);
-    showAppToast(context, '$label terunggah (simulasi prototype).');
+  Future<void> _pick(RentalDocument doc) async {
+    final state = AppStateScope.read(context);
+    final file = await state.pickFile(imagesOnly: false);
+    if (file == null || !mounted) return;
+    if ((file.bytes?.length ?? 0) > maxUploadBytes) {
+      showAppToast(context, 'Ukuran ${doc.label} melebihi 5 MB.');
+      return;
+    }
+    state.attachRentalDocument(doc.key, file);
+    showAppToast(context, '${doc.label} siap dikirim.');
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_busy) return;
     setState(() => _submitted = true);
     final state = AppStateScope.read(context);
-    final missing = DummyData.rentalDocuments
-        .where((label) => !state.rentalDraft.documents.containsKey(label))
+    final missing = RentalDocument.all
+        .where((doc) => !state.rentalDraft.documents.containsKey(doc.key))
         .toList();
     if (missing.isNotEmpty) {
-      showAppToast(context, 'Unggah ${missing.first} terlebih dahulu.');
+      showAppToast(context, 'Unggah ${missing.first.label} terlebih dahulu.');
       return;
     }
     if (!_agreed) return;
-    final request = state.submitRental();
-    setState(() => _sent = request);
-    _showSubmitted(request);
+    setState(() => _busy = true);
+    try {
+      final request = await state.submitRental();
+      if (!mounted) return;
+      setState(() => _sent = request);
+      _showSubmitted(request);
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.displayMessage);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _showSubmitted(RentalRequest request) {
@@ -120,14 +138,14 @@ class _RentalDocumentsScreenState extends State<RentalDocumentsScreen> {
                       'Format PDF/JPG, ukuran maksimal 5 MB per berkas.',
                       style: AppText.poppins(12, color: AppColors.muted),
                     ),
-                    for (final label in DummyData.rentalDocuments) ...[
+                    for (final doc in RentalDocument.all) ...[
                       const SizedBox(height: 16),
                       UploadField(
-                        label: label,
-                        file: draft.documents[label],
+                        label: doc.label,
+                        file: draft.documents[doc.key],
                         hasError:
-                            _submitted && !draft.documents.containsKey(label),
-                        onPick: () => _pick(label),
+                            _submitted && !draft.documents.containsKey(doc.key),
+                        onPick: () => _pick(doc),
                       ),
                     ],
                     const SizedBox(height: 16),
@@ -148,7 +166,10 @@ class _RentalDocumentsScreenState extends State<RentalDocumentsScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    AppButton(label: 'Kirim Pengajuan', onPressed: _submit),
+                    AppButton(
+                      label: _busy ? 'Mengirim…' : 'Kirim Pengajuan',
+                      onPressed: _busy ? null : _submit,
+                    ),
                     const SizedBox(height: 10),
                     AppButton.outline(
                       label: '← Kembali ke Formulir',

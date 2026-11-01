@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../data/dummy/community_data.dart';
+import '../../state/app_state.dart';
+import '../../widgets/common/load_status.dart';
 import '../../routes/app_routes.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/artwork_image.dart';
@@ -22,7 +23,22 @@ class CommunityDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final community = CommunityData.byId(communityId);
+    final state = AppStateScope.of(context);
+    final community = state.communityById(communityId);
+    if (community == null) {
+      return TkbjScaffold(
+        children: [
+          ContentSection(
+            child: state.catalogState == LoadState.ready
+                ? const LoadStatus(
+                    loading: false,
+                    error: 'Komunitas tidak ditemukan di direktori.',
+                  )
+                : LoadStatus.catalog(state),
+          ),
+        ],
+      );
+    }
 
     return TkbjScaffold(
       children: [
@@ -63,7 +79,12 @@ class CommunityDetailScreen extends StatelessWidget {
               const SizedBox(height: 16),
               Row(
                 children: [
-                  _Stat(value: '${community.foundedYear}', label: 'Berdiri'),
+                  _Stat(
+                    value: community.foundedYear > 0
+                        ? '${community.foundedYear}'
+                        : '–',
+                    label: 'Berdiri',
+                  ),
                   const SizedBox(width: 8),
                   _Stat(value: '${community.members}', label: 'Anggota'),
                   const SizedBox(width: 8),
@@ -83,6 +104,8 @@ class CommunityDetailScreen extends StatelessWidget {
                 children: [
                   for (final (day, time) in community.schedule)
                     InfoRow(label: day, value: time),
+                  if (community.schedule.isEmpty)
+                    const InfoRow(label: 'Jadwal', value: 'Hubungi pengurus'),
                   InfoRow(label: 'Tempat', value: community.place),
                 ],
               ),

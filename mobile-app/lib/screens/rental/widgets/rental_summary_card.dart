@@ -15,6 +15,8 @@ class RentalSummaryCard extends StatelessWidget {
     required this.facility,
     required this.date,
     required this.slot,
+    this.amount,
+    this.timeLabel,
     this.title = 'Ringkasan Pengajuan',
     this.showRate = false,
     this.footer = const [],
@@ -23,6 +25,12 @@ class RentalSummaryCard extends StatelessWidget {
   final Facility? facility;
   final DateTime? date;
   final RentalSlot? slot;
+
+  /// Nominal tagihan dari server; bila kosong dipakai tarif venue.
+  final int? amount;
+
+  /// Jam sewa dari server ("09:00–17:00"), untuk sewa di luar slot standar.
+  final String? timeLabel;
   final String title;
 
   /// Tampilkan baris "Tarif" (dipakai di halaman pembayaran).
@@ -35,11 +43,14 @@ class RentalSummaryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rate = facility?.ratePerHour;
-    final cost = rate != null && slot != null ? rate * slot!.hours : null;
+    final rate = facility?.rentalRate;
+    final cost = amount ?? (slot != null ? rate : null);
+    final hours = slot?.hours;
     final schedule = [
       if (date != null) Formatters.longDate(date!),
-      if (slot != null)
+      if (timeLabel != null)
+        timeLabel!
+      else if (slot != null)
         showRate ? slot!.shortLabel : Formatters.hour(slot!.startHour),
     ].join(' · ');
 
@@ -50,15 +61,15 @@ class RentalSummaryCard extends StatelessWidget {
       children: [
         InfoRow(label: 'Venue', value: facility?.name ?? _empty),
         InfoRow(label: 'Tanggal', value: schedule.isEmpty ? _empty : schedule),
-        if (showRate && rate != null && slot != null)
+        if (showRate && cost != null)
           InfoRow(
             label: 'Tarif',
-            value: '${Formatters.rupiah(rate)} × ${slot!.hours} jam',
+            value: '${Formatters.rupiah(cost)} / pemakaian',
           )
         else
           InfoRow(
             label: 'Durasi',
-            value: slot == null ? _empty : '${slot!.hours} Jam',
+            value: hours == null ? _empty : '$hours Jam',
           ),
         const ThinDivider(),
         InfoRow(

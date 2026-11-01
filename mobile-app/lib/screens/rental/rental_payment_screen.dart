@@ -7,10 +7,12 @@ import '../../data/models/ticket_order.dart';
 import '../../routes/app_routes.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
+import '../../widgets/common/app_feedback.dart';
+import '../../widgets/common/section_card.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
-import '../checkout/widgets/payment_option_tile.dart';
+import '../checkout/widgets/payment_proof_form.dart';
 import 'widgets/rental_not_found.dart';
 import 'widgets/rental_summary_card.dart';
 
@@ -25,13 +27,18 @@ class RentalPaymentScreen extends StatefulWidget {
 }
 
 class _RentalPaymentScreenState extends State<RentalPaymentScreen> {
-  PaymentMethod _method = PaymentMethod.qris;
-
-  void _pay() {
-    AppStateScope.read(context).payRental(widget.code, _method);
+  Future<void> _pay(
+    PaymentMethod method,
+    UploadedFile proof,
+    String sender,
+  ) async {
+    await AppStateScope.read(context)
+        .payRental(widget.code, method, proof, sender);
+    if (!mounted) return;
+    showAppToast(context, 'Bukti pembayaran sewa terkirim.');
     AppRoutes.openFromHome(
       context,
-      AppRoutes.rentalReceipt,
+      AppRoutes.rentalStatus,
       arguments: widget.code,
     );
   }
@@ -40,7 +47,8 @@ class _RentalPaymentScreenState extends State<RentalPaymentScreen> {
   Widget build(BuildContext context) {
     final request = AppStateScope.of(context).findRental(widget.code);
     if (request == null) return RentalNotFound(code: widget.code);
-    final canPay = request.status == RentalStatus.approved;
+    final canPay =
+        request.status == RentalStatus.approved && !request.isVerifyingPayment;
 
     return TkbjScaffold(
       children: [
@@ -79,32 +87,38 @@ class _RentalPaymentScreenState extends State<RentalPaymentScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Pilih Metode Pembayaran Resmi',
-                style: AppText.playfair(20, color: AppColors.maroon),
-              ),
-              const SizedBox(height: 20),
-              for (final method in PaymentMethod.values) ...[
-                PaymentOptionTile(
-                  method: method,
-                  selected: _method == method,
-                  onTap: () => setState(() => _method = method),
-                ),
-                const SizedBox(height: 12),
-              ],
-              const SizedBox(height: 8),
               RentalSummaryCard(
                 title: 'Ringkasan Sewa',
                 facility: request.facility,
                 date: request.date,
                 slot: request.slot,
+                amount: request.amount,
+                timeLabel: request.timeLabel,
                 showRate: true,
               ),
               const SizedBox(height: 20),
-              AppButton(
-                label: canPay ? 'Bayar Sekarang →' : 'Sudah Dibayar',
-                onPressed: canPay ? _pay : null,
-              ),
+              if (request.paymentNote != null &&
+                  request.payment == PaymentStatus.waiting) ...[
+                NoticeBanner(
+                  leading: '!',
+                  color: AppColors.error,
+                  message: 'Bukti sebelumnya ditolak: ${request.paymentNote}',
+                ),
+                const SizedBox(height: 16),
+              ],
+              if (canPay)
+                PaymentProofForm(
+                  amount: request.amount,
+                  submitLabel: 'Kirim Bukti Pembayaran Sewa →',
+                  onSubmit: _pay,
+                )
+              else
+                AppButton(
+                  label: request.isVerifyingPayment
+                      ? 'Sedang Diverifikasi Admin'
+                      : 'Sudah Dibayar',
+                  onPressed: null,
+                ),
               const SizedBox(height: 10),
               AppButton.outline(
                 label: '← Lihat Status Pengajuan',

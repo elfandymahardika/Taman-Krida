@@ -73,8 +73,20 @@ abstract final class AppRoutes {
   static const editProfile = '/akun/edit-profil';
   static const notifications = '/akun/notifikasi';
 
-  /// Rute yang hanya bisa dibuka setelah login.
+  /// Rute yang hanya bisa dibuka setelah login (data milik akun, atau aksi
+  /// yang dikirim ke server atas nama akun).
   static const _protected = {
+    checkoutBuyer,
+    checkoutPayment,
+    checkoutConfirm,
+    checkoutSuccess,
+    rentalForm,
+    rentalDocuments,
+    rentalStatus,
+    rentalRejected,
+    rentalPayment,
+    rentalReceipt,
+    communityRegister,
     account,
     myTickets,
     rentalHistory,

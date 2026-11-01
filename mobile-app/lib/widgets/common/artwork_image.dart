@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
-/// Foto dari aset lokal. Jika file belum tersedia (mis. foto Figma yang
+/// Foto dari aset lokal atau URL. Jika file belum tersedia (mis. foto Figma yang
 /// belum diekspor), tampil sampul gradien maroon dengan simbol emas.
 class ArtworkImage extends StatelessWidget {
   const ArtworkImage(
@@ -25,19 +25,29 @@ class ArtworkImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: Image.asset(
-        asset,
-        width: width,
-        height: height,
-        fit: BoxFit.cover,
-        alignment: alignment,
-        cacheWidth: cacheWidth,
-        errorBuilder: (context, error, stackTrace) =>
-            _Placeholder(width: width, height: height),
-      ),
-    );
+    Widget fallback(BuildContext context, Object error, StackTrace? trace) =>
+        _Placeholder(width: width, height: height);
+    // Foto yang diunggah admin di dashboard berupa URL.
+    final image = asset.startsWith('http')
+        ? Image.network(
+            asset,
+            width: width,
+            height: height,
+            fit: BoxFit.cover,
+            alignment: alignment,
+            cacheWidth: cacheWidth,
+            errorBuilder: fallback,
+          )
+        : Image.asset(
+            asset,
+            width: width,
+            height: height,
+            fit: BoxFit.cover,
+            alignment: alignment,
+            cacheWidth: cacheWidth,
+            errorBuilder: fallback,
+          );
+    return ClipRRect(borderRadius: BorderRadius.circular(radius), child: image);
   }
 }
 

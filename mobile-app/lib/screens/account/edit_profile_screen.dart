@@ -58,14 +58,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    final error = AppStateScope.read(context).updateProfile(
+    final error = await AppStateScope.read(context).updateProfile(
       name: _nameController.text,
       email: _emailController.text,
       phone: _phoneController.text,
       city: _cityController.text,
     );
+    if (!mounted) return;
     if (error != null) {
       showAppToast(context, error);
       return;

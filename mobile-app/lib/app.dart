@@ -19,6 +19,13 @@ class _TkbjAppState extends State<TkbjApp> {
   late final AppRouter _router = AppRouter(_state);
 
   @override
+  void initState() {
+    super.initState();
+    // Muat data dari server (atau data contoh) & pulihkan sesi login.
+    _state.init();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return AppStateScope(
       state: _state,

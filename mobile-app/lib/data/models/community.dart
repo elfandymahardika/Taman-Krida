@@ -49,6 +49,9 @@ class CommunityRegistration {
     required this.address,
     required this.description,
     required this.submittedAt,
+    this.id,
+    this.status = 'Menunggu persetujuan',
+    this.adminNote,
   });
 
   final String name;
@@ -58,4 +61,9 @@ class CommunityRegistration {
   final String address;
   final String description;
   final DateTime submittedAt;
+
+  /// Diisi server: id komunitas, status persetujuan admin, dan catatannya.
+  final String? id;
+  final String status;
+  final String? adminNote;
 }

@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/formatters.dart';
-import '../../data/dummy/dummy_data.dart';
 import '../../data/models/facility.dart';
 import '../../routes/app_routes.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_feedback.dart';
+import '../../widgets/common/load_status.dart';
 import '../../widgets/common/section_card.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
@@ -27,7 +27,6 @@ class RentalVenueScreen extends StatefulWidget {
 }
 
 class _RentalVenueScreenState extends State<RentalVenueScreen> {
-  final _venues = DummyData.facilities.where((f) => f.isRentable).toList();
   Facility? _selected;
   bool _initialized = false;
 
@@ -37,9 +36,10 @@ class _RentalVenueScreenState extends State<RentalVenueScreen> {
     if (_initialized) return;
     _initialized = true;
     final id = widget.initialFacilityId;
+    final state = AppStateScope.read(context);
     _selected = id != null
-        ? _venues.firstWhere((f) => f.id == id)
-        : AppStateScope.read(context).rentalDraft.facility;
+        ? state.facilityById(id)
+        : state.rentalDraft.facility;
   }
 
   void _continue() {
@@ -54,6 +54,13 @@ class _RentalVenueScreenState extends State<RentalVenueScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final state = AppStateScope.of(context);
+    final venues = state.rentableFacilities;
+    // Dibuka dari denah sebelum data fasilitas selesai dimuat.
+    if (_selected == null && widget.initialFacilityId != null) {
+      _selected = state.facilityById(widget.initialFacilityId!);
+    }
+
     return TkbjScaffold(
       children: [
         PageHeader(
@@ -71,7 +78,8 @@ class _RentalVenueScreenState extends State<RentalVenueScreen> {
             children: [
               Text('Pilih Venue Fasilitas', style: AppText.playfair(18)),
               const SizedBox(height: 10),
-              for (final venue in _venues) ...[
+              if (venues.isEmpty) LoadStatus.catalog(state),
+              for (final venue in venues) ...[
                 _VenueCard(
                   facility: venue,
                   selected: venue.id == _selected?.id,
@@ -170,7 +178,8 @@ class _VenueCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '${Formatters.rupiahShort(facility.ratePerHour!)} / Jam',
+                        '${Formatters.rupiahShort(facility.rentalRate!)} / '
+                        'pemakaian',
                         style: AppText.poppins(
                           13,
                           weight: FontWeight.w700,

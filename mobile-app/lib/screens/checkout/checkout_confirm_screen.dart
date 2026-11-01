@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/formatters.dart';
+import '../../data/api/api_client.dart';
+import '../../data/models/rental_request.dart';
 import '../../data/models/ticket_order.dart';
 import '../../routes/app_routes.dart';
 import '../../state/app_state.dart';
@@ -14,19 +16,56 @@ import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
 import 'widgets/checkout_header.dart';
 import 'widgets/empty_cart_notice.dart';
+import 'widgets/payment_proof_form.dart';
 import 'widgets/qr_code_box.dart';
 
-/// Checkout langkah 3: konfirmasi pembayaran (node 1:851).
-class CheckoutConfirmScreen extends StatelessWidget {
+/// Checkout langkah 3: konfirmasi pembayaran (node 1:851). Pesanan dibuat di
+/// server (masuk menu Transaksi dashboard), lalu bukti bayar diunggah untuk
+/// diverifikasi Admin Keuangan.
+class CheckoutConfirmScreen extends StatefulWidget {
   const CheckoutConfirmScreen({super.key});
 
-  void _complete(BuildContext context) {
-    final order = AppStateScope.read(context).placeOrder();
+  @override
+  State<CheckoutConfirmScreen> createState() => _CheckoutConfirmScreenState();
+}
+
+class _CheckoutConfirmScreenState extends State<CheckoutConfirmScreen> {
+  /// Pesanan yang sudah dibuat; dipakai ulang bila unggah bukti gagal.
+  TicketOrder? _order;
+  bool _busy = false;
+
+  Future<TicketOrder> _ensureOrder() async =>
+      _order ??= await AppStateScope.read(context).placeOrder();
+
+  void _openStatus(String code) {
     Navigator.of(context).pushNamedAndRemoveUntil(
       AppRoutes.checkoutSuccess,
       (route) => route.isFirst,
-      arguments: order.bookingCode,
+      arguments: code,
     );
+  }
+
+  Future<void> _payNow(
+    PaymentMethod method,
+    UploadedFile proof,
+    String sender,
+  ) async {
+    final state = AppStateScope.read(context);
+    final order = await _ensureOrder();
+    await state.payBooking(order.bookingCode, method, proof, sender);
+    if (mounted) _openStatus(order.bookingCode);
+  }
+
+  Future<void> _payLater() async {
+    setState(() => _busy = true);
+    try {
+      final order = await _ensureOrder();
+      if (mounted) _openStatus(order.bookingCode);
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.displayMessage);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
@@ -35,6 +74,8 @@ class CheckoutConfirmScreen extends StatelessWidget {
     final buyer = state.buyer;
     final method = state.paymentMethod;
     final isVirtualAccount = method == PaymentMethod.virtualAccount;
+    final total = _order?.total ?? state.cartTotal;
+    final ready = _order != null || (buyer != null && !state.isCartEmpty);
 
     return TkbjScaffold(
       children: [
@@ -50,7 +91,7 @@ class CheckoutConfirmScreen extends StatelessWidget {
                     'pertunjukan Anda.',
         ),
         ContentSection(
-          child: buyer == null || state.isCartEmpty
+          child: !ready
               ? const EmptyCartNotice()
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -64,21 +105,21 @@ class CheckoutConfirmScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     _PaymentPanel(
                       isVirtualAccount: isVirtualAccount,
-                      seed: '${buyer.email}${state.cartTotal}',
-                      phone: buyer.phone,
+                      seed: '${buyer?.email}$total',
+                      phone: buyer?.phone ?? '',
                     ),
                     const SizedBox(height: 16),
-                    _BookingDetail(
-                      buyer: buyer,
-                      method: method,
-                      total: state.cartTotal,
-                    ),
+                    if (buyer != null)
+                      _BookingDetail(
+                        buyer: buyer,
+                        method: method,
+                        total: total,
+                      ),
                     const SizedBox(height: 12),
                     Text(
-                      '*Sistem kami akan memverifikasi pembayaran Anda secara '
-                      'real-time setelah proses pemindaian berhasil '
-                      'diselesaikan. (Simulasi prototipe — tidak ada dana '
-                      'yang ditarik.)',
+                      '*Kode QR & nomor VA di atas adalah contoh. Setelah '
+                      'membayar, unggah bukti pembayaran agar pesanan '
+                      'diverifikasi Admin Keuangan TKBJ.',
                       style: AppText.poppins(
                         11,
                         color: AppColors.muted,
@@ -86,18 +127,30 @@ class CheckoutConfirmScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    AppButton(
-                      label: 'Konfirmasi Selesai →',
-                      fontSize: 13,
-                      onPressed: () => _complete(context),
+                    PaymentProofForm(
+                      amount: total,
+                      initialMethod: method,
+                      showMethods: false,
+                      submitLabel: 'Pesan & Kirim Bukti Pembayaran →',
+                      onSubmit: _payNow,
                     ),
                     const SizedBox(height: 10),
                     AppButton.outline(
-                      label: '← Ganti Metode Bayar',
+                      label: _busy
+                          ? 'Memproses…'
+                          : 'Pesan Sekarang, Bayar Nanti',
                       fontSize: 13,
                       borderWidth: 1.5,
-                      onPressed: () => Navigator.of(context).pop(),
+                      onPressed: _busy ? null : _payLater,
                     ),
+                    const SizedBox(height: 10),
+                    if (_order == null)
+                      AppButton.outline(
+                        label: '← Ganti Metode Bayar',
+                        fontSize: 13,
+                        borderWidth: 1.5,
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
                   ],
                 ),
         ),

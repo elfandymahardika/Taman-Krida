@@ -1,8 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Memanggil API TKBJ (backend/mobile-app). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- usesCleartextTraffic: server lokal (http://10.0.2.2:5001 / IP laptop) belum memakai HTTPS.
+         Matikan saat API sudah di HTTPS (mis. Ngrok atau server produksi). -->
     <application
         android:label="TKBJ"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

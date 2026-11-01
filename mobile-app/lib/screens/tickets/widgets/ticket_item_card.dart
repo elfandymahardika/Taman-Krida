@@ -76,7 +76,10 @@ class TicketItemCard extends StatelessWidget {
                     ),
                     QtyStepper(
                       value: quantity,
-                      max: AppState.maxTicketsPerEvent,
+                      max: event.quotaLeft.clamp(
+                        0,
+                        AppState.maxTicketsPerEvent,
+                      ),
                       onChanged: onQuantityChanged,
                     ),
                   ],

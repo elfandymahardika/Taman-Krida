@@ -9,6 +9,7 @@ import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_feedback.dart';
 import '../../widgets/common/info_row.dart';
+import '../../widgets/common/load_status.dart';
 import '../../widgets/common/pill_badge.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
@@ -52,17 +53,39 @@ class EventDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final event = AppStateScope.of(context).eventById(eventId);
+    final state = AppStateScope.of(context);
+    final event = state.eventById(eventId);
     final navigator = Navigator.of(context);
+    final header = PageHeader(
+      breadcrumb: 'Beranda / Kalender Acara / Detail',
+      title: 'Detail Acara',
+      subtitle: 'Informasi lengkap pertunjukan sebelum Anda memesan tiket.',
+      onBreadcrumbTap: () => AppRoutes.goHome(context),
+    );
+
+    if (event == null) {
+      return TkbjScaffold(
+        children: [
+          header,
+          ContentSection(
+            child: state.catalogState == LoadState.ready
+                ? LoadStatus(
+                    loading: false,
+                    error:
+                        'Acara tidak ditemukan atau sudah tidak '
+                        'dipublikasikan.',
+                    onRetry: state.loadCatalog,
+                  )
+                : LoadStatus.catalog(state),
+          ),
+        ],
+      );
+    }
+    final bookable = event.isTicketed && !state.isDatePast(event.date);
 
     return TkbjScaffold(
       children: [
-        PageHeader(
-          breadcrumb: 'Beranda / Kalender Acara / Detail',
-          title: 'Detail Acara',
-          subtitle: 'Informasi lengkap pertunjukan sebelum Anda memesan tiket.',
-          onBreadcrumbTap: () => AppRoutes.goHome(context),
-        ),
+        header,
         ContentSection(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
           child: Column(
@@ -109,10 +132,15 @@ class EventDetailScreen extends StatelessWidget {
                 style: AppText.poppins(13, color: AppColors.muted, height: 1.6),
               ),
               const SizedBox(height: 16),
-              if (event.isTicketed)
+              if (bookable)
                 AppButton(
                   label: 'Pesan Tiket Sekarang',
                   onPressed: () => _confirmOrder(context, event),
+                )
+              else if (event.isTicketed)
+                const AppButton(
+                  label: 'Acara Sudah Berlangsung',
+                  onPressed: null,
                 )
               else
                 AppButton(
@@ -161,11 +189,13 @@ class _EventInfoCard extends StatelessWidget {
             value: event.venue,
             onValueTap: onLocationTap,
           ),
-          const SizedBox(height: 10),
-          InfoRow(
-            label: 'Kuota tersisa',
-            value: '${event.quotaLeft} dari ${event.quotaTotal} kursi',
-          ),
+          if (event.isTicketed) ...[
+            const SizedBox(height: 10),
+            InfoRow(
+              label: 'Kuota tersisa',
+              value: '${event.quotaLeft} dari ${event.quotaTotal} kursi',
+            ),
+          ],
           const SizedBox(height: 10),
           const ThinDivider(),
           const SizedBox(height: 10),

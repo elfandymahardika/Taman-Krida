@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/formatters.dart';
-import '../../data/dummy/dummy_data.dart';
 import '../../routes/app_routes.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_feedback.dart';
 import '../../widgets/common/info_row.dart';
+import '../../widgets/common/load_status.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
 import '../../widgets/layout/responsive_grid.dart';
@@ -30,7 +30,7 @@ class TicketListScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final ticketedEvents = DummyData.events.where((e) => e.isTicketed);
+    final ticketedEvents = state.ticketedEvents;
     final lines = state.cartLines;
 
     return TkbjScaffold(
@@ -44,18 +44,29 @@ class TicketListScreen extends StatelessWidget {
           onBreadcrumbTap: () => AppRoutes.goHome(context),
         ),
         ContentSection(
-          child: ResponsiveGrid(
-            children: [
-              for (final event in ticketedEvents)
-                TicketItemCard(
-                  event: event,
-                  quantity: state.quantityOf(event.id),
-                  onQuantityChanged: (qty) => state.setQuantity(event.id, qty),
-                  onOpenDetail: () => Navigator.of(context)
-                      .pushNamed(AppRoutes.eventDetail, arguments: event.id),
+          child: state.catalogState != LoadState.ready
+              ? LoadStatus.catalog(state)
+              : ticketedEvents.isEmpty
+              ? const LoadStatus(
+                  loading: false,
+                  error:
+                      'Belum ada pertunjukan bertiket yang bisa dipesan. '
+                      'Pantau Kalender Acara untuk agenda berikutnya.',
+                )
+              : ResponsiveGrid(
+                  children: [
+                    for (final event in ticketedEvents)
+                      TicketItemCard(
+                        event: event,
+                        quantity: state.quantityOf(event.id),
+                        onQuantityChanged: (qty) =>
+                            state.setQuantity(event.id, qty),
+                        onOpenDetail: () => Navigator.of(
+                          context,
+                        ).pushNamed(AppRoutes.eventDetail, arguments: event.id),
+                      ),
+                  ],
                 ),
-            ],
-          ),
         ),
         ContentSection(
           color: AppColors.white,

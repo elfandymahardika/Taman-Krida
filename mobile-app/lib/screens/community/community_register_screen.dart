@@ -4,16 +4,14 @@ import 'package:flutter/services.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/utils/validators.dart';
-import '../../data/dummy/community_data.dart';
+import '../../data/api/api_client.dart';
 import '../../data/models/community.dart';
-import '../../data/models/rental_request.dart';
 import '../../routes/app_routes.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_feedback.dart';
 import '../../widgets/form/app_checkbox.dart';
 import '../../widgets/form/labeled_text_field.dart';
-import '../../widgets/form/upload_field.dart';
 import '../../widgets/interactive/chip_filter.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
@@ -37,9 +35,9 @@ class _CommunityRegisterScreenState extends State<CommunityRegisterScreen> {
   final _addressController = TextEditingController();
   final _descriptionController = TextEditingController();
   String? _category;
-  UploadedFile? _photo;
   bool _agreed = false;
   bool _submitted = false;
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -51,36 +49,33 @@ class _CommunityRegisterScreenState extends State<CommunityRegisterScreen> {
     super.dispose();
   }
 
-  void _pickPhoto() {
-    setState(
-      () => _photo = const UploadedFile(
-        fileName: 'foto_kegiatan.jpg',
-        sizeLabel: '1,4 MB',
-        type: 'JPG',
-      ),
-    );
-    showAppToast(context, 'Contoh prototype: foto dipilih dari galeri.');
-  }
-
-  void _submit() {
+  Future<void> _submit() async {
+    if (_busy) return;
     setState(() => _submitted = true);
     final fieldsValid = _formKey.currentState!.validate();
-    if (!fieldsValid || _category == null || _photo == null || !_agreed) {
+    if (!fieldsValid || _category == null || !_agreed) {
       showAppToast(context, 'Lengkapi semua data yang ditandai merah.');
       return;
     }
-    AppStateScope.read(context).registerCommunity(
-      CommunityRegistration(
-        name: _nameController.text.trim(),
-        category: _category!,
-        leader: _leaderController.text.trim(),
-        phone: _phoneController.text.trim(),
-        address: _addressController.text.trim(),
-        description: _descriptionController.text.trim(),
-        submittedAt: DateTime.now(),
-      ),
-    );
-    _showSubmitted();
+    setState(() => _busy = true);
+    try {
+      await AppStateScope.read(context).registerCommunity(
+        CommunityRegistration(
+          name: _nameController.text.trim(),
+          category: _category!,
+          leader: _leaderController.text.trim(),
+          phone: _phoneController.text.trim(),
+          address: _addressController.text.trim(),
+          description: _descriptionController.text.trim(),
+          submittedAt: DateTime.now(),
+        ),
+      );
+      if (mounted) _showSubmitted();
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.displayMessage);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   void _showSubmitted() {
@@ -167,8 +162,14 @@ class _CommunityRegisterScreenState extends State<CommunityRegisterScreen> {
                 LabeledTextField(
                   label: 'Alamat Sekretariat',
                   controller: _addressController,
-                  hint: 'Kota/Kabupaten di Jawa Timur',
-                  validator: (v) => Validators.name(v, fieldName: 'Alamat'),
+                  hint: 'Jalan, kota/kabupaten di Jawa Timur',
+                  validator: (v) {
+                    final empty = Validators.required(v, 'Alamat');
+                    if (empty != null) return empty;
+                    return v!.trim().length < 10
+                        ? 'Alamat minimal 10 karakter.'
+                        : null;
+                  },
                 ),
                 const SizedBox(height: 16),
                 LabeledTextField(
@@ -183,18 +184,12 @@ class _CommunityRegisterScreenState extends State<CommunityRegisterScreen> {
                   validator: (v) {
                     final empty = Validators.required(v, 'Deskripsi');
                     if (empty != null) return empty;
-                    return v!.trim().length < 20
-                        ? 'Deskripsi minimal 20 karakter.'
+                    final length = v!.trim().length;
+                    if (length < 20) return 'Deskripsi minimal 20 karakter.';
+                    return length > 500
+                        ? 'Deskripsi maksimal 500 karakter.'
                         : null;
                   },
-                ),
-                const SizedBox(height: 16),
-                UploadField(
-                  label: 'Foto Kegiatan',
-                  file: _photo,
-                  hint: 'Ketuk untuk memilih foto · JPG/PNG maks. 5 MB',
-                  hasError: _submitted && _photo == null,
-                  onPick: _pickPhoto,
                 ),
                 const SizedBox(height: 16),
                 LabeledCheckbox(
@@ -214,7 +209,10 @@ class _CommunityRegisterScreenState extends State<CommunityRegisterScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                AppButton(label: 'Kirim Pendaftaran', onPressed: _submit),
+                AppButton(
+                  label: _busy ? 'Mengirim…' : 'Kirim Pendaftaran',
+                  onPressed: _busy ? null : _submit,
+                ),
                 const SizedBox(height: 10),
                 AppButton.outline(
                   label: '← Kembali ke Direktori',
@@ -254,7 +252,9 @@ class _CategoryPicker extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final category in CommunityData.registerCategories)
+            for (final category in AppStateScope.of(
+              context,
+            ).communityCategories)
               ChipFilter(
                 label: category,
                 active: category == selected,

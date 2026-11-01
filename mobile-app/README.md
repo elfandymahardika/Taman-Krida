@@ -10,7 +10,15 @@ Aplikasi ini adalah pasangan dari [Dashboard Web admin](../admin-dashboard) dala
 - menjelajah Virtual Galeri, Direktori Komunitas, dan Edukasi Budaya;
 - mengelola tiket, riwayat sewa, profil, dan notifikasi di akun mereka.
 
-Tampilan mengikuti desain Figma tim ([Highfi-Taman-Krida](https://www.figma.com/design/arjM0e1ApzkZ58oERTzCa8/Highfi-Taman-Krida), halaman **mobile**, frame 390 px). Seluruh data adalah **data contoh (dummy)** di memori, tanpa database.
+Tampilan mengikuti desain Figma tim ([Highfi-Taman-Krida](https://www.figma.com/design/arjM0e1ApzkZ58oERTzCa8/Highfi-Taman-Krida), halaman **mobile**, frame 390 px).
+
+**Data dari backend.** Aplikasi tersambung ke [`backend/mobile-app`](../backend/mobile-app), yang memakai database yang sama dengan Dashboard Web:
+
+- Agenda, fasilitas, galeri, dan komunitas yang tampil adalah data yang dipublikasikan admin.
+- Pesanan tiket, bukti pembayaran, pengajuan sewa (beserta berkasnya), dan pendaftaran komunitas langsung masuk ke antrean admin.
+- Keputusan admin (lunas, disetujui, ditolak) kembali ke aplikasi sebagai status dan notifikasi.
+
+Untuk presentasi tanpa server ada **mode demo** yang memakai data contoh di memori (lihat [Panduan menjalankan](#panduan-menjalankan-aplikasi)).
 
 ---
 
@@ -23,7 +31,7 @@ Tampilan mengikuti desain Figma tim ([Highfi-Taman-Krida](https://www.figma.com/
 | Form input | Login, Daftar Akun, Lupa Kata Sandi, **Data Pemesan** (checkout), **Formulir Kegiatan** & **Unggah Berkas** (sewa gedung), **Daftarkan Komunitas**, Edit Profil. |
 | Halaman yang menampilkan data / hasil input | Kalender & detail acara, galeri, komunitas, materi edukasi, **E-Tiket**, **Tiket Saya**, **Status Pengajuan**, **Bukti Reservasi**, **Riwayat Sewa**, **Notifikasi**, Akun Saya. Data yang diisi di form langsung muncul di halaman ini. |
 | Navigasi antarhalaman | 32 rute bernama (`lib/routes/app_routes.dart`), menu navigasi layar penuh, breadcrumb, rute akun yang dilindungi login (otomatis diarahkan ke halaman Masuk). |
-| Validasi sederhana | Wajib isi, format email, nomor WhatsApp `08…` 10–13 digit, kata sandi ≥ 8 karakter, persetujuan ketentuan, keranjang tidak boleh kosong, jumlah tiket 0–4, **tanggal/slot venue penuh**, **3 berkas sewa wajib diunggah**, kategori komunitas wajib dipilih, deskripsi ≥ 20 karakter. |
+| Validasi sederhana | Wajib isi, format email, nomor WhatsApp `08…` 10–13 digit, kata sandi ≥ 8 karakter dengan huruf besar, huruf kecil & angka (sama dengan server), persetujuan ketentuan, keranjang tidak boleh kosong, jumlah tiket 0–4, **tanggal/slot venue penuh**, **3 berkas sewa wajib diunggah**, kategori komunitas wajib dipilih, deskripsi ≥ 20 karakter. |
 | Data dummy | `lib/data/dummy/` (acara, fasilitas, galeri, komunitas, materi edukasi, akun, pesanan, pengajuan sewa, notifikasi). |
 | Rancangan AI | Lihat [Rancangan Fitur AI](#rancangan-fitur-ai). |
 
@@ -42,17 +50,32 @@ Tekan **Pakai** pada kotak akun demo di halaman Masuk untuk mengisi form otomati
 Prasyarat: **Flutter 3.x** (diuji dengan Flutter 3.47.1 / Dart 3.13), serta emulator Android, perangkat Android, atau Chrome.
 
 ```bash
-# 1. Clone repository lalu masuk ke folder aplikasi mobile
-git clone <url-repository-ini>
-cd <nama-folder>/mobile-app
+# 0. Nyalakan backend dulu (MySQL/XAMPP harus menyala), lihat README root:
+#    backend/admin-dashboard (port 5000) lalu backend/mobile-app (port 5001)
 
-# 2. Pasang dependensi
+# 1. Pasang dependensi
+cd mobile-app
 flutter pub get
 
-# 3. Jalankan (pilih perangkat yang tersedia)
-flutter run            # emulator / HP Android
-flutter run -d chrome  # atau di browser
+# 2. Jalankan (pilih perangkat yang tersedia)
+flutter run            # emulator Android → otomatis memanggil http://10.0.2.2:5001/api
+flutter run -d chrome  # browser → http://localhost:5001/api
 ```
+
+**Alamat server lain**, misalnya HP sungguhan di Wi-Fi yang sama atau Ngrok:
+
+```bash
+flutter run --dart-define=API_URL=http://192.168.1.10:5001/api
+flutter run --dart-define=API_URL=https://xxxx.ngrok-free.app/api
+```
+
+**Mode demo tanpa server**: data contoh di memori. Di mode ini keputusan admin bisa disimulasikan lewat tombol di layar status.
+
+```bash
+flutter run --dart-define=DEMO_MODE=true
+```
+
+Akun demo `budi.santoso@email.com` / `tkbj2026` berlaku di kedua mode, karena sama dengan seeder backend.
 
 Proyek juga bisa dibuka di **Android Studio** (plugin Flutter): File → Open → pilih folder `mobile-app`, lalu Run.
 
@@ -67,7 +90,22 @@ flutter build web             # hasil: build/web/
 
 ```bash
 flutter analyze   # analisis statis (lint)
-flutter test      # 151 test: unit, alur fitur, dan responsif
+flutter test      # 152 test: unit, alur fitur, dan responsif (memakai mode demo, tanpa server)
+```
+
+**Uji terhadap server sungguhan** (`test/live_api_test.dart`, dilewati bila alamat tidak diisi). Test ini memakai API dashboard untuk keputusan admin, sehingga mencakup:
+
+- data publik dan kalender ketersediaan;
+- login dan sesi tersimpan;
+- checkout tiket → bukti bayar → diverifikasi admin → e-tiket;
+- pengajuan sewa + 3 berkas → disetujui → bayar → lunas;
+- pendaftaran komunitas.
+
+Jalankan di database berisi data contoh (`npm run seed` di kedua backend), karena test ini membuat data baru:
+
+```powershell
+$env:TKBJ_API_URL='http://localhost:5001/api'; $env:TKBJ_ADMIN_URL='http://localhost:5000/api'
+flutter test test/live_api_test.dart
 ```
 
 - `test/widget_test.dart` dan `test/feature_flows_test.dart` menguji alur login, checkout tiket, sewa gedung (ajukan → disetujui/ditolak → bayar), validasi unggah berkas, daftar komunitas, filter galeri, dan notifikasi.
@@ -87,6 +125,9 @@ flutter test test_screenshots --update-goldens
 |---|---|---|
 | [flutter](https://flutter.dev) (SDK) | 3.47.1 | Framework UI |
 | [flutter_svg](https://pub.dev/packages/flutter_svg) | 2.3.0 | Menampilkan ikon & logo SVG hasil ekspor Figma |
+| [http](https://pub.dev/packages/http) + [http_parser](https://pub.dev/packages/http_parser) | 1.6 / 4.1 | Memanggil REST API (JSON & multipart unggah berkas) |
+| [file_picker](https://pub.dev/packages/file_picker) | 13.3 | Memilih berkas sewa (KTP, surat, proposal) & bukti pembayaran |
+| [shared_preferences](https://pub.dev/packages/shared_preferences) | 2.5 | Menyimpan token login agar tetap masuk setelah aplikasi ditutup |
 | flutter_test (SDK, dev) | — | Unit test & widget test |
 | [flutter_lints](https://pub.dev/packages/flutter_lints) (dev) | 6.0.0 | Aturan lint |
 
@@ -156,16 +197,22 @@ State management memakai `ChangeNotifier` + `InheritedNotifier` bawaan Flutter (
 
 ## Alur utama
 
-1. **Pesan tiket:** Beranda → Kalender Acara (filter kategori & rentang waktu) → Detail Acara → *"Ingin memesan tiket?"* → Pesan Tiket (stepper 0–4) → Data Pemesan → Metode Bayar (QRIS / Virtual Account / E-Wallet) → Konfirmasi → **E-Tiket + kode booking** → Tiket Saya.
-2. **Sewa gedung:** Pilih Venue → Cek Jadwal (kalender ketersediaan + slot waktu; tanggal penuh membuka sheet *"Jadwal tidak tersedia"*) → Formulir Kegiatan → Unggah Berkas (KTP, surat permohonan, proposal) → *Pengajuan terkirim* → **Status Verifikasi**. Di layar status ada tombol **simulasi keputusan admin**:
-   - **Disetujui** → Pembayaran Sewa → **Bukti Reservasi**;
-   - **Ditolak** → catatan admin → **Ajukan Ulang** (venue & nama kegiatan terisi otomatis).
+1. **Pesan tiket** (wajib masuk): Beranda → Kalender Acara (filter kategori & rentang waktu) → Detail Acara → *"Ingin memesan tiket?"* → Pesan Tiket (stepper 0–4, dibatasi sisa kuota) → Data Pemesan → Metode Bayar (QRIS / Virtual Account / E-Wallet) → Konfirmasi.
+   - Di Konfirmasi, unggah **bukti pembayaran** lalu tekan *Pesan & Kirim Bukti*, atau pilih *Pesan Sekarang, Bayar Nanti*.
+   - Pesanan masuk ke menu **Transaksi** dashboard dengan status *Menunggu pembayaran* → *Sedang diverifikasi*.
+   - Setelah Admin Keuangan memverifikasi, statusnya menjadi **Lunas**, lalu **E-Tiket** dan kode tiket terbit di Tiket Saya.
+2. **Sewa gedung:** Pilih Venue → Cek Jadwal → Formulir Kegiatan → Unggah Berkas → *Pengajuan terkirim* → **Status Verifikasi**.
+   - Kalender ketersediaan diambil dari server: slot yang bentrok dengan acara atau sewa lain tampil *Penuh*.
+   - Berkas yang diunggah adalah KTP, surat permohonan, dan proposal (PDF/JPG/PNG, maksimal 5 MB).
+   - Admin Sewa memutuskan di dashboard:
+     - **Disetujui** → Pembayaran Sewa (unggah bukti) → diverifikasi Admin Keuangan → **Bukti Reservasi**;
+     - **Ditolak** → catatan admin → **Ajukan Ulang** (venue & nama kegiatan terisi otomatis).
 3. **Virtual Galeri:** filter kategori → detail dengan tab Foto (geser foto, thumbnail) dan Video.
 4. **Direktori Komunitas:** filter kategori → detail sanggar (statistik, jadwal latihan, kontak) → *Hubungi via WhatsApp*; atau **Daftarkan Komunitas** → *Pendaftaran terkirim* → notifikasi baru.
 5. **Edukasi Budaya:** 6 materi → detail dengan tab **Sejarah** (linimasa), **Filosofi**, dan **Foto/Video**.
 6. **Akun:** Masuk / Daftar → Akun Saya → Tiket Saya, Riwayat Sewa (tombol sesuai status), Edit Profil, **Notifikasi** (tandai dibaca, buka halaman terkait), Keluar.
 
-Pembelian tiket, keputusan sewa, dan pendaftaran komunitas otomatis menambah notifikasi baru.
+Pemesanan tiket, pengajuan sewa, pendaftaran komunitas, dan setiap keputusan admin otomatis menambah notifikasi baru. Notifikasi dimuat ulang saat layar Akun, Notifikasi, Tiket Saya, Riwayat Sewa, atau status dibuka, dan bisa dimuat ulang manual dengan tombol *Muat Ulang Status*.
 
 ---
 
@@ -219,13 +266,17 @@ mobile-app/
 │   ├── core/
 │   │   ├── constants/            path aset
 │   │   ├── theme/                token warna, gaya teks, ThemeData
-│   │   └── utils/                formatter rupiah/tanggal, validator, breakpoint
+│   │   └── utils/                formatter rupiah/tanggal, validator, breakpoint, pemilih berkas
 │   ├── data/
+│   │   ├── api/                  ApiClient (HTTP, token, multipart, ApiException),
+│   │   │                         Visuals (foto & posisi denah untuk data server)
+│   │   ├── repository/           TkbjRepository: ApiRepository (backend/mobile-app)
+│   │   │                         & DemoRepository (data contoh, test & mode demo)
 │   │   ├── models/               acara, fasilitas, pesanan, pengajuan sewa, galeri,
 │   │   │                         komunitas, materi edukasi, notifikasi, akun
-│   │   └── dummy/                data contoh per fitur
-│   ├── state/app_state.dart      sesi, keranjang, pesanan, draft & pengajuan sewa,
-│   │                             pendaftaran komunitas, notifikasi
+│   │   └── dummy/                data contoh per fitur (dipakai DemoRepository)
+│   ├── state/app_state.dart      data dari repository: katalog, sesi, keranjang,
+│   │                             pesanan, sewa & ketersediaan, komunitas, notifikasi
 │   ├── routes/app_routes.dart    nama rute, router, proteksi login
 │   ├── widgets/                  komponen global yang dipakai ulang
 │   │   ├── layout/               TkbjScaffold, navbar, footer, PageHeader, ContentSection, ResponsiveGrid
@@ -243,7 +294,10 @@ mobile-app/
 ## Catatan
 
 - Status bar dan *home indicator* pada frame Figma adalah bingkai perangkat, sehingga tidak digambar ulang; aplikasi memakai status bar asli sistem operasi.
-- **Simulasi:** pembayaran (kode QR tiruan), unggah berkas/foto (tanpa file picker), tombol WhatsApp, pemutar video, dan keputusan admin sewa. Semua ditandai "simulasi prototype" di aplikasi.
+- **Masih simulasi:** kode QR & nomor Virtual Account (contoh; pembayaran dibuktikan lewat unggah bukti yang diverifikasi admin), tombol WhatsApp, pemutar video, dan *Lupa Kata Sandi* (belum ada layanan email). Pada **mode demo**, keputusan admin juga disimulasikan lewat tombol di layar status.
+- **Edukasi Budaya** tetap memakai materi statis di aplikasi, karena dashboard belum punya modul materi edukasi.
+- **Komunitas dari dashboard:** kategori mengikuti dashboard (*Seni tari tradisional, Seni pertunjukan, Seni musik, Seni kriya*). Jadwal latihan & jumlah pentas belum dikelola admin, jadi tampil "Hubungi pengurus" / "–". Foto kegiatan tidak diminta saat mendaftar karena server belum menyimpannya.
+- **Tarif sewa** dihitung per pemakaian (tarif yang ditagihkan dashboard saat sewa disetujui), bukan per jam.
 - **Foto yang belum diekspor dari Figma:** gamelan, latihan sanggar, dan jaranan. Batas akses Figma MCP (paket Starter) mencegah pengunduhan, sehingga aplikasi menampilkan sampul gradien maroon sebagai gantinya. Untuk memakai foto asli, ekspor dari Figma lalu simpan sebagai `assets/images/gamelan.png`, `assets/images/latihan-sanggar.png`, dan `assets/images/jaranan.png`; tidak perlu mengubah kode.
-- Kalender ketersediaan sewa dihitung dari data contoh: tanggal sebelum hari ini tidak bisa dipilih, beberapa tanggal/slot sengaja ditandai penuh, dan slot yang sudah diajukan otomatis menjadi penuh.
-- Data tersimpan di memori dan kembali ke data contoh saat aplikasi ditutup.
+- "Hari ini" mengikuti server (`APP_TODAY` di backend, bawaan 2 Oktober 2026), agar data contoh tetap relevan. Mode demo memakai 1 Juni 2026, sesuai tanggal desain.
+- Pada mode demo, data tersimpan di memori dan kembali ke data contoh saat aplikasi ditutup. Pada mode server, token login disimpan di perangkat, sehingga pengguna tetap masuk setelah aplikasi dibuka lagi.

@@ -47,7 +47,7 @@ Future<void> showFacilitySheet(BuildContext context, Facility facility) {
         Text(
           facility.isRentable
               ? '${facility.capacityLabel} · '
-                    '${Formatters.rupiah(facility.ratePerHour!)}/jam'
+                    '${Formatters.rupiah(facility.rentalRate!)}/pemakaian'
               : facility.capacityLabel,
           style: AppText.poppins(
             12,

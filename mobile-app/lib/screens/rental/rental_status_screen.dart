@@ -6,6 +6,9 @@ import '../../data/models/rental_request.dart';
 import '../../routes/app_routes.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
+import '../../widgets/common/load_status.dart';
+import '../../widgets/common/refresh_on_open.dart';
+import '../../widgets/common/section_card.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
@@ -20,100 +23,157 @@ class RentalStatusScreen extends StatelessWidget {
 
   final String code;
 
-  void _simulateApproved(BuildContext context) {
-    AppStateScope.read(context).approveRental(code);
-    Navigator.of(context).pushNamed(AppRoutes.rentalPayment, arguments: code);
+  Future<void> _simulateApproved(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    await AppStateScope.read(context)
+        .simulateAdmin((demo) => demo.approveRental(code));
+    navigator.pushNamed(AppRoutes.rentalPayment, arguments: code);
   }
 
-  void _simulateRejected(BuildContext context) {
-    AppStateScope.read(context).rejectRental(code);
-    Navigator.of(context)
-        .pushReplacementNamed(AppRoutes.rentalRejected, arguments: code);
+  Future<void> _simulateRejected(BuildContext context) async {
+    final navigator = Navigator.of(context);
+    await AppStateScope.read(context)
+        .simulateAdmin((demo) => demo.rejectRental(code));
+    navigator.pushReplacementNamed(AppRoutes.rentalRejected, arguments: code);
   }
 
   @override
   Widget build(BuildContext context) {
-    final request = AppStateScope.of(context).findRental(code);
-    if (request == null) return RentalNotFound(code: code);
+    final state = AppStateScope.of(context);
+    final request = state.findRental(code);
+    if (request == null) {
+      return RefreshOnOpen(
+        child: state.accountLoading
+            ? const TkbjScaffold(
+                children: [ContentSection(child: LoadStatus(loading: true))],
+              )
+            : RentalNotFound(code: code),
+      );
+    }
     final navigator = Navigator.of(context);
     final status = request.status;
+    final refreshButton = AppButton.outline(
+      label: state.accountLoading ? 'Memuat…' : 'Muat Ulang Status',
+      onPressed: state.accountLoading ? null : state.refreshAccount,
+    );
 
-    return TkbjScaffold(
-      children: [
-        PageHeader(
-          breadcrumb: 'Sewa Gedung / Status',
-          title: 'Status Pengajuan',
-          subtitle: switch (status) {
-            RentalStatus.pending =>
-              'Pengajuan Anda sedang ditinjau oleh admin TKBJ.',
-            RentalStatus.approved =>
-              'Pengajuan disetujui. Selesaikan pembayaran sewa.',
-            RentalStatus.paid => 'Reservasi venue Anda sudah terkonfirmasi.',
-            RentalStatus.rejected => 'Pengajuan ditolak admin TKBJ.',
-          },
-          onBreadcrumbTap: () => AppRoutes.goHome(context),
-        ),
-        const RentalStepper(current: 5),
-        ContentSection(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _StatusCard(request: request),
-              const SizedBox(height: 16),
-              ProcessTimeline(request: request),
-              const SizedBox(height: 16),
-              RentalSummaryCard(
-                facility: request.facility,
-                date: request.date,
-                slot: request.slot,
-              ),
-              const SizedBox(height: 16),
-              switch (status) {
-                RentalStatus.pending => _SimulationPanel(
-                  onApproved: () => _simulateApproved(context),
-                  onRejected: () => _simulateRejected(context),
+    return RefreshOnOpen(
+      child: TkbjScaffold(
+        children: [
+          PageHeader(
+            breadcrumb: 'Sewa Gedung / Status',
+            title: 'Status Pengajuan',
+            subtitle: switch (status) {
+              RentalStatus.pending =>
+                'Pengajuan Anda sedang ditinjau oleh admin TKBJ.',
+              RentalStatus.approved =>
+                'Pengajuan disetujui. Selesaikan pembayaran sewa.',
+              RentalStatus.paid => 'Reservasi venue Anda sudah terkonfirmasi.',
+              RentalStatus.rejected => 'Pengajuan ditolak admin TKBJ.',
+            },
+            onBreadcrumbTap: () => AppRoutes.goHome(context),
+          ),
+          const RentalStepper(current: 5),
+          ContentSection(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _StatusCard(request: request),
+                const SizedBox(height: 16),
+                ProcessTimeline(request: request),
+                const SizedBox(height: 16),
+                RentalSummaryCard(
+                  facility: request.facility,
+                  date: request.date,
+                  slot: request.slot,
+                  amount: request.amount,
+                  timeLabel: request.timeLabel,
                 ),
-                RentalStatus.approved => AppButton(
-                  label: 'Lanjut ke Pembayaran →',
-                  onPressed: () => navigator.pushNamed(
-                    AppRoutes.rentalPayment,
-                    arguments: code,
+                const SizedBox(height: 16),
+                switch (status) {
+                  RentalStatus.pending when state.canSimulateAdmin =>
+                    _SimulationPanel(
+                      onApproved: () => _simulateApproved(context),
+                      onRejected: () => _simulateRejected(context),
+                    ),
+                  RentalStatus.pending => Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const NoticeBanner(
+                        color: AppColors.gold,
+                        message:
+                            'Admin Sewa TKBJ sedang meninjau pengajuan & '
+                            'berkas Anda. Hasilnya dikirim lewat notifikasi.',
+                      ),
+                      const SizedBox(height: 12),
+                      refreshButton,
+                    ],
                   ),
-                ),
-                RentalStatus.paid => AppButton(
-                  label: 'Lihat Bukti Reservasi',
-                  onPressed: () => navigator.pushNamed(
-                    AppRoutes.rentalReceipt,
-                    arguments: code,
+                  RentalStatus.approved when request.isVerifyingPayment =>
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const NoticeBanner(
+                          color: AppColors.gold,
+                          message:
+                              'Bukti pembayaran terkirim dan sedang '
+                              'diverifikasi Admin Keuangan TKBJ.',
+                        ),
+                        const SizedBox(height: 12),
+                        refreshButton,
+                        if (state.canSimulateAdmin) ...[
+                          const SizedBox(height: 10),
+                          AppButton(
+                            label: 'Simulasi: Admin Verifikasi Lunas',
+                            onPressed: () => state.simulateAdmin(
+                              (demo) => demo.confirmPayment(code),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  RentalStatus.approved => AppButton(
+                    label: 'Lanjut ke Pembayaran →',
+                    onPressed: () => navigator.pushNamed(
+                      AppRoutes.rentalPayment,
+                      arguments: code,
+                    ),
                   ),
-                ),
-                RentalStatus.rejected => AppButton(
-                  label: 'Lihat Catatan Admin',
-                  onPressed: () => navigator.pushReplacementNamed(
-                    AppRoutes.rentalRejected,
-                    arguments: code,
+                  RentalStatus.paid => AppButton(
+                    label: 'Lihat Bukti Reservasi',
+                    onPressed: () => navigator.pushNamed(
+                      AppRoutes.rentalReceipt,
+                      arguments: code,
+                    ),
                   ),
-                ),
-              },
-              const SizedBox(height: 16),
-              Center(
-                child: TextButton(
-                  onPressed: () => AppRoutes.goHome(context),
-                  child: Text(
-                    'Kembali ke Beranda',
-                    style: AppText.poppins(
-                      13,
-                      weight: FontWeight.w600,
-                      color: AppColors.maroon,
+                  RentalStatus.rejected => AppButton(
+                    label: 'Lihat Catatan Admin',
+                    onPressed: () => navigator.pushReplacementNamed(
+                      AppRoutes.rentalRejected,
+                      arguments: code,
+                    ),
+                  ),
+                },
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: () => AppRoutes.goHome(context),
+                    child: Text(
+                      'Kembali ke Beranda',
+                      style: AppText.poppins(
+                        13,
+                        weight: FontWeight.w600,
+                        color: AppColors.maroon,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

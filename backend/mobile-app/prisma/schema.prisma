@@ -1,0 +1,531 @@
+// SALINAN OTOMATIS dari backend/admin-dashboard/prisma/schema.prisma — jangan diubah di sini.
+// Ubah skema di backend dashboard, buat migration di sana, lalu jalankan `npm run prisma:sync` di folder ini.
+
+// Skema database TKBJ — satu sumber untuk SELURUH tabel: panel admin (backend/admin-dashboard)
+// dan aplikasi pengunjung (tabel visitor_*, dipakai backend/mobile-app). Migration hanya dibuat
+// dan dijalankan dari folder ini (npm run migrate). Nama kolom snake_case = nama kolom di MySQL.
+//
+// Koneksi diambil dari DATABASE_URL, yang disusun otomatis dari DB_HOST/DB_PORT/DB_USER/
+// DB_PASSWORD/DB_NAME di .env oleh src/lib/databaseUrl.ts (script migrate/seed & lib/prisma.ts).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Akun staf & sesi login panel admin
+// ============================================================
+
+/// Staf admin. `password_hash` = hash bcrypt. `role_key` kosong = pendaftar yang belum disetujui.
+model User {
+  id            BigInt      @id @default(autoincrement())
+  username      String      @unique(map: "username") @db.VarChar(40)
+  password_hash String      @db.VarChar(255)
+  name          String      @db.VarChar(60)
+  email         String      @unique(map: "email") @db.VarChar(100)
+  role_key      UserRole?
+  initials      String      @db.VarChar(4)
+  status        UserStatus  @default(Menunggu_persetujuan)
+  last_seen_at  DateTime?   @db.DateTime(3)
+  created_at    DateTime    @default(now()) @db.DateTime(3)
+  updated_at    DateTime    @default(now()) @db.DateTime(3)
+  sessions      Session[]
+  notes         Note[]
+  documents     Document[]
+
+  @@map("users")
+}
+
+/// Satu baris per login staf; logout mengisi `revoked_at` sehingga token JWT-nya ikut tidak berlaku.
+model Session {
+  id         String    @id @db.Char(36)
+  user_id    BigInt
+  created_at DateTime  @db.DateTime(3)
+  expires_at DateTime  @db.DateTime(3)
+  revoked_at DateTime? @db.DateTime(3)
+  user_agent String?   @db.VarChar(200)
+  user       User      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "sessions_ibfk_1")
+
+  @@index([user_id], map: "user_id")
+  @@map("sessions")
+}
+
+enum UserRole {
+  admin
+  acara
+  keuangan
+  sewa
+  konten
+
+  @@map("users_role_key")
+}
+
+enum UserStatus {
+  Aktif
+  Nonaktif
+  Undangan
+  Menunggu_persetujuan @map("Menunggu persetujuan")
+  Ditolak
+
+  @@map("users_status")
+}
+
+// ============================================================
+// Data panel admin
+// ============================================================
+
+/// Data tunggal key–value: profil lembaga (`profile`) dan pengaturan panel (`settings`), nilai JSON.
+model Kv {
+  name       String   @id @db.VarChar(40)
+  value      String   @db.Text
+  updated_at DateTime @db.DateTime(3)
+  updated_by String?  @db.VarChar(60)
+
+  @@map("kv")
+}
+
+/// Area/fasilitas TKBJ. `bookable` = dipakai sebagai lokasi acara & sewa.
+model Facility {
+  id       String  @id @db.VarChar(50)
+  name     String  @unique(map: "name") @db.VarChar(60)
+  capacity Int?
+  purpose  String  @db.VarChar(100)
+  note     String? @db.VarChar(200)
+  photo    String? @db.VarChar(30)
+  bookable Boolean @default(false)
+  sort     Int
+
+  @@map("facilities")
+}
+
+/// Virtual galeri. `photo` = foto bawaan aplikasi; `file` = berkas unggahan (nama di folder uploads/
+/// atau URL Vercel Blob).
+model Media {
+  id          String      @id @db.VarChar(40)
+  title       String      @db.VarChar(100)
+  collection  String      @db.VarChar(60)
+  date        DateTime    @db.Date
+  type        MediaType
+  photo       String?     @db.VarChar(30)
+  file        String?     @db.VarChar(500)
+  mime        String?     @db.VarChar(50)
+  status      MediaStatus
+  credit      String      @db.VarChar(100)
+  description String?     @db.VarChar(500)
+  bytes       BigInt
+  dims        String?     @db.VarChar(40)
+  created_at  DateTime    @db.DateTime(3)
+
+  @@map("media")
+}
+
+enum MediaType {
+  Foto
+  Video
+
+  @@map("media_type")
+}
+
+enum MediaStatus {
+  Terpublikasi
+  Draf
+
+  @@map("media_status")
+}
+
+/// Konten informasi: banner beranda, berita, pengumuman, artikel budaya.
+model Content {
+  id           String        @id @db.VarChar(40)
+  title        String        @db.VarChar(120)
+  type         ContentType
+  author       String        @db.VarChar(60)
+  status       ContentStatus
+  summary      String?       @db.VarChar(300)
+  body         String?       @db.Text
+  cta          String?       @db.VarChar(30)
+  link         String?       @db.VarChar(255)
+  publish_from DateTime?     @db.Date
+  publish_to   DateTime?     @db.Date
+  is_hero      Boolean       @default(false)
+  updated_at   DateTime      @db.DateTime(3)
+
+  @@map("contents")
+}
+
+enum ContentType {
+  Banner_beranda @map("Banner beranda")
+  Berita
+  Pengumuman
+  Artikel_budaya @map("Artikel budaya")
+
+  @@map("contents_type")
+}
+
+enum ContentStatus {
+  Terpublikasi
+  Terjadwal
+  Draf
+
+  @@map("contents_status")
+}
+
+/// Agenda acara. `quota` kosong = acara tanpa tiket.
+model Event {
+  id         String      @id @db.VarChar(40)
+  name       String      @db.VarChar(80)
+  short      String      @db.VarChar(80)
+  organizer  String      @db.VarChar(100)
+  date       DateTime    @db.Date
+  start_time DateTime    @db.Time(0)
+  end_time   DateTime    @db.Time(0)
+  venue      String      @db.VarChar(60)
+  status     EventStatus @default(Draf)
+  quota      Int?
+  sold       Int?
+  price      Int?
+  photo      String?     @db.VarChar(30)
+  created_at DateTime    @db.DateTime(3)
+  updated_at DateTime    @db.DateTime(3)
+  orders     Order[]
+
+  @@index([date], map: "events_date")
+  @@map("events")
+}
+
+enum EventStatus {
+  Terpublikasi
+  Draf
+
+  @@map("events_status")
+}
+
+/// Permintaan sewa gedung (dari aplikasi pengunjung atau dicatat admin).
+model Rental {
+  id           String         @id @db.VarChar(20)
+  applicant    String         @db.VarChar(100)
+  venue        String         @db.VarChar(60)
+  date         DateTime       @db.Date
+  start_time   DateTime       @db.Time(0)
+  end_time     DateTime       @db.Time(0)
+  activity     String         @db.VarChar(200)
+  approval     RentalApproval @default(Perlu_ditinjau)
+  file         String?        @db.VarChar(120)
+  admin_note   String?        @db.VarChar(500)
+  files_ok     Boolean        @default(false)
+  submitted_at DateTime       @db.DateTime(3)
+  decided_at   DateTime?      @db.DateTime(3)
+  orders       Order[]
+
+  @@map("rentals")
+}
+
+enum RentalApproval {
+  Perlu_ditinjau @map("Perlu ditinjau")
+  Disetujui
+  Ditolak
+
+  @@map("rentals_approval")
+}
+
+/// Transaksi: pesanan tiket (ke events) dan tagihan sewa gedung (ke rentals).
+model Order {
+  id                 String        @id @db.VarChar(20)
+  type               OrderType
+  customer           String        @db.VarChar(100)
+  event_id           String?       @db.VarChar(40)
+  rental_id          String?       @db.VarChar(20)
+  service            String        @db.VarChar(100)
+  service_date       DateTime      @db.Date
+  qty                Int?
+  amount             Int
+  payment            PaymentStatus
+  method             String?       @db.VarChar(40)
+  proof_method       String?       @db.VarChar(60)
+  proof_file         String?       @db.VarChar(120)
+  proof_from         String?       @db.VarChar(100)
+  proof_submitted_at DateTime?     @db.DateTime(3)
+  note               String?       @db.VarChar(500)
+  created_at         DateTime      @db.DateTime(3)
+  paid_at            DateTime?     @db.DateTime(3)
+  event              Event?        @relation(fields: [event_id], references: [id], onUpdate: Restrict, map: "orders_ibfk_1")
+  rental             Rental?       @relation(fields: [rental_id], references: [id], onUpdate: Restrict, map: "orders_ibfk_2")
+
+  @@index([event_id], map: "event_id")
+  @@index([created_at], map: "orders_created_at")
+  @@index([rental_id], map: "rental_id")
+  @@map("orders")
+}
+
+enum OrderType {
+  Tiket
+  Sewa_gedung @map("Sewa gedung")
+
+  @@map("orders_type")
+}
+
+enum PaymentStatus {
+  Lunas
+  Perlu_verifikasi @map("Perlu verifikasi")
+  Menunggu_bayar   @map("Menunggu bayar")
+
+  @@map("orders_payment")
+}
+
+/// Direktori komunitas seni. Pendaftaran baru menunggu persetujuan admin.
+model Community {
+  id         String          @id @db.VarChar(50)
+  name       String          @db.VarChar(100)
+  category   String          @db.VarChar(40)
+  city       String          @db.VarChar(60)
+  members    Int             @default(0)
+  contact    String          @db.VarChar(20)
+  photo      String?         @db.VarChar(30)
+  status     CommunityStatus
+  leader     String?         @db.VarChar(100)
+  since      String?         @db.VarChar(40)
+  admin_note String?         @db.VarChar(500)
+  applied_at DateTime?       @db.DateTime(3)
+
+  @@map("communities")
+}
+
+enum CommunityStatus {
+  Aktif
+  Nonaktif
+  Menunggu_persetujuan @map("Menunggu persetujuan")
+  Ditolak
+
+  @@map("communities_status")
+}
+
+/// Rekap keuangan bulanan (juta rupiah) untuk grafik dashboard.
+model FinanceMonthly {
+  month         String  @id @db.Char(7)
+  sales_ticket  Decimal @default(0.000) @db.Decimal(10, 3)
+  sales_rental  Decimal @default(0.000) @db.Decimal(10, 3)
+  p_stage       Decimal @default(0.000) @db.Decimal(10, 3)
+  p_artist      Decimal @default(0.000) @db.Decimal(10, 3)
+  p_maintenance Decimal @default(0.000) @db.Decimal(10, 3)
+  p_promo       Decimal @default(0.000) @db.Decimal(10, 3)
+
+  @@map("finance_monthly")
+}
+
+/// Log aktivitas dashboard.
+model Activity {
+  id         BigInt       @id @default(autoincrement())
+  kind       ActivityKind
+  title      String       @db.VarChar(120)
+  sub        String       @db.VarChar(255)
+  created_at DateTime     @db.DateTime(3)
+
+  @@index([created_at], map: "activity_created_at")
+  @@map("activity")
+}
+
+enum ActivityKind {
+  payment
+  event
+  rental
+  community
+  content
+  gallery
+  user
+  system
+
+  @@map("activity_kind")
+}
+
+/// Notifikasi lonceng admin.
+model Notification {
+  id         BigInt    @id @default(autoincrement())
+  message    String    @db.VarChar(255)
+  link       String?   @db.VarChar(100)
+  created_at DateTime  @db.DateTime(3)
+  read_at    DateTime? @db.DateTime(3)
+
+  @@map("notifications")
+}
+
+/// Catatan pribadi staf (Modul 02), terisolasi per `user_id`.
+model Note {
+  id         BigInt     @id @default(autoincrement())
+  user_id    BigInt
+  title      String     @db.VarChar(100)
+  content    String?    @db.VarChar(500)
+  status     NoteStatus @default(Draf)
+  created_at DateTime   @default(now()) @db.DateTime(3)
+  updated_at DateTime   @default(now()) @db.DateTime(3)
+  user       User       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "notes_ibfk_1")
+
+  @@index([user_id], map: "user_id")
+  @@map("notes")
+}
+
+enum NoteStatus {
+  Draf
+  Terpublikasi
+  Diarsipkan
+
+  @@map("notes_status")
+}
+
+/// Dokumen staf (Modul 03): metadata saja, berkas di Vercel Blob atau folder uploads/.
+model Document {
+  id         String   @id @db.Char(36)
+  name       String   @db.VarChar(255)
+  file_key   String   @unique(map: "file_key") @db.VarChar(500)
+  file_type  String   @db.VarChar(100)
+  file_size  Int
+  url        String   @db.VarChar(1000)
+  user_id    BigInt
+  created_at DateTime @default(now()) @db.DateTime(3)
+  user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "documents_ibfk_1")
+
+  @@index([user_id], map: "idx_documents_user_id")
+  @@map("documents")
+}
+
+// ============================================================
+// Aplikasi pengunjung (backend/mobile-app)
+// Tautan ke orders/rentals/communities sengaja tanpa foreign key: id-nya bisa dipakai ulang setelah
+// data contoh dashboard di-seed ulang, dan tautan lama ikut ditimpa.
+// ============================================================
+
+/// Akun pengunjung aplikasi mobile (login email, tanpa peran).
+model Visitor {
+  id            BigInt               @id @default(autoincrement())
+  name          String               @db.VarChar(60)
+  email         String               @unique(map: "email") @db.VarChar(100)
+  phone         String               @db.VarChar(20)
+  city          String?              @db.VarChar(60)
+  password_hash String               @db.VarChar(255)
+  created_at    DateTime             @default(now()) @db.DateTime(3)
+  updated_at    DateTime             @default(now()) @db.DateTime(3)
+  sessions      VisitorSession[]
+  orders        VisitorOrder[]
+  rentals       VisitorRental[]
+  files         VisitorFile[]
+  communities   VisitorCommunity[]
+  notifications VisitorNotification[]
+
+  @@map("visitors")
+}
+
+/// Satu baris per login pengunjung (logout = `revoked_at`).
+model VisitorSession {
+  id         String    @id @db.Char(36)
+  visitor_id BigInt
+  created_at DateTime  @db.DateTime(3)
+  expires_at DateTime  @db.DateTime(3)
+  revoked_at DateTime? @db.DateTime(3)
+  user_agent String?   @db.VarChar(200)
+  visitor    Visitor   @relation(fields: [visitor_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "visitor_sessions_ibfk_1")
+
+  @@index([visitor_id], map: "visitor_id")
+  @@map("visitor_sessions")
+}
+
+/// Pemilik pesanan tiket di `orders`; satu kode booking bisa berisi beberapa pesanan.
+model VisitorOrder {
+  order_id        String   @id @db.VarChar(20)
+  visitor_id      BigInt
+  booking_code    String   @db.VarChar(20)
+  buyer_email     String   @db.VarChar(100)
+  buyer_phone     String   @db.VarChar(20)
+  /// Status bayar terakhir yang sudah diberitahukan ke pengunjung.
+  notified_status String   @db.VarChar(30)
+  created_at      DateTime @db.DateTime(3)
+  visitor         Visitor  @relation(fields: [visitor_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "visitor_orders_ibfk_1")
+
+  @@index([visitor_id], map: "visitor_id")
+  @@index([booking_code], map: "visitor_orders_booking_code")
+  @@map("visitor_orders")
+}
+
+/// Pemilik permintaan sewa di `rentals` + kontak pemohon.
+model VisitorRental {
+  rental_id       String   @id @db.VarChar(20)
+  visitor_id      BigInt
+  contact         String   @db.VarChar(20)
+  notified_status String   @db.VarChar(30)
+  created_at      DateTime @db.DateTime(3)
+  visitor         Visitor  @relation(fields: [visitor_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "visitor_rentals_ibfk_1")
+
+  @@index([visitor_id], map: "visitor_id")
+  @@map("visitor_rentals")
+}
+
+/// Berkas pengunjung (KTP, surat, proposal, bukti bayar). `file_key` = nama berkas lokal atau URL
+/// Vercel Blob; `ref` = kode sewa atau kode booking.
+model VisitorFile {
+  id         String          @id @db.Char(36)
+  visitor_id BigInt
+  kind       VisitorFileKind
+  ref        String          @db.VarChar(20)
+  name       String          @db.VarChar(255)
+  file_key   String          @unique(map: "file_key") @db.VarChar(500)
+  mime       String          @db.VarChar(100)
+  size       Int
+  created_at DateTime        @db.DateTime(3)
+  visitor    Visitor         @relation(fields: [visitor_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "visitor_files_ibfk_1")
+
+  @@index([ref], map: "visitor_files_ref")
+  @@index([visitor_id], map: "visitor_id")
+  @@map("visitor_files")
+}
+
+enum VisitorFileKind {
+  ktp
+  surat
+  proposal
+  bukti
+
+  @@map("visitor_files_kind")
+}
+
+/// Pendaftar komunitas di `communities` + alamat & deskripsi.
+model VisitorCommunity {
+  community_id    String   @id @db.VarChar(50)
+  visitor_id      BigInt
+  address         String   @db.VarChar(200)
+  description     String   @db.VarChar(500)
+  notified_status String   @db.VarChar(30)
+  created_at      DateTime @db.DateTime(3)
+  visitor         Visitor  @relation(fields: [visitor_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "visitor_communities_ibfk_1")
+
+  @@index([visitor_id], map: "visitor_id")
+  @@map("visitor_communities")
+}
+
+/// Notifikasi akun pengunjung; `target` = halaman aplikasi yang dibuka.
+model VisitorNotification {
+  id         BigInt                    @id @default(autoincrement())
+  visitor_id BigInt
+  symbol     String                    @db.VarChar(8)
+  title      String                    @db.VarChar(100)
+  body       String                    @db.VarChar(255)
+  target     VisitorNotificationTarget
+  target_id  String?                   @db.VarChar(50)
+  created_at DateTime                  @db.DateTime(3)
+  read_at    DateTime?                 @db.DateTime(3)
+  visitor    Visitor                   @relation(fields: [visitor_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "visitor_notifications_ibfk_1")
+
+  @@index([visitor_id, id], map: "visitor_notifications_visitor_id_id")
+  @@map("visitor_notifications")
+}
+
+enum VisitorNotificationTarget {
+  rental
+  event
+  tickets
+  communities
+  calendar
+
+  @@map("visitor_notifications_target")
+}

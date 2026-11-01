@@ -1,0 +1,10 @@
+node_modules
+.env
+data/*.db
+data/*.db-*
+*.log
+uploads/
+
+# Authtoken & kredensial
+ngrok.yml
+dist

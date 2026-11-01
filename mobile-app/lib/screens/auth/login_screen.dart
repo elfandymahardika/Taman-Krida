@@ -33,6 +33,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _rememberMe = true;
   bool _obscure = true;
   String? _loginError;
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -41,18 +42,24 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_busy) return;
     setState(() => _loginError = null);
     if (!_formKey.currentState!.validate()) return;
 
-    final error = AppStateScope.read(context)
-        .login(_emailController.text, _passwordController.text);
+    final state = AppStateScope.read(context);
+    setState(() => _busy = true);
+    final error = await state.login(
+      _emailController.text,
+      _passwordController.text,
+    );
+    if (!mounted) return;
+    setState(() => _busy = false);
     if (error != null) {
       setState(() => _loginError = error);
       return;
     }
 
-    final state = AppStateScope.read(context);
     showAppToast(context, 'Selamat datang, ${state.currentUser!.name}!');
     Navigator.of(context).pushReplacementNamed(
       widget.args?.redirectTo ?? AppRoutes.account,
@@ -62,7 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _fillDemoAccount() {
     _emailController.text = DummyData.demoAccount.email;
-    _passwordController.text = DummyData.demoAccount.password;
+    _passwordController.text = DummyData.demoPassword;
     setState(() => _loginError = null);
   }
 
@@ -144,9 +151,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                     AppButton(
-                      label: 'Masuk ke Akun',
+                      label: _busy ? 'Memproses…' : 'Masuk ke Akun',
                       fontSize: 13,
-                      onPressed: _submit,
+                      onPressed: _busy ? null : _submit,
                     ),
                     const SizedBox(height: 12),
                     _DemoAccountHint(onUse: _fillDemoAccount),
@@ -180,7 +187,7 @@ class _DemoAccountHint extends StatelessWidget {
           Expanded(
             child: Text(
               'Akun demo: ${DummyData.demoAccount.email} · '
-              '${DummyData.demoAccount.password}',
+              '${DummyData.demoPassword}',
               style: AppText.poppins(11, weight: FontWeight.w500),
             ),
           ),

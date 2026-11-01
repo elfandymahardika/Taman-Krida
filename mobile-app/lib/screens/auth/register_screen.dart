@@ -35,6 +35,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscure = true;
   bool _submitted = false;
   String? _registerError;
+  bool _busy = false;
 
   @override
   void dispose() {
@@ -45,7 +46,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_busy) return;
     setState(() {
       _submitted = true;
       _registerError = null;
@@ -53,12 +55,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final fieldsValid = _formKey.currentState!.validate();
     if (!fieldsValid || !_agreed) return;
 
-    final error = AppStateScope.read(context).register(
+    setState(() => _busy = true);
+    final error = await AppStateScope.read(context).register(
       name: _nameController.text,
       email: _emailController.text,
       phone: _phoneController.text,
       password: _passwordController.text,
     );
+    if (!mounted) return;
+    setState(() => _busy = false);
     if (error != null) {
       setState(() => _registerError = error);
       return;
@@ -123,7 +128,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   LabeledTextField(
                     label: 'Kata Sandi Baru',
                     controller: _passwordController,
-                    hint: 'Buat kata sandi minimal 8 karakter',
+                    hint: 'Min. 8 karakter: huruf besar, huruf kecil & angka',
                     obscureText: _obscure,
                     textInputAction: TextInputAction.done,
                     validator: Validators.password,
@@ -154,9 +159,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 14),
                   AppButton(
-                    label: 'Daftar Akun Baru',
+                    label: _busy ? 'Memproses…' : 'Daftar Akun Baru',
                     fontSize: 13,
-                    onPressed: _submit,
+                    onPressed: _busy ? null : _submit,
                   ),
                 ],
               ),

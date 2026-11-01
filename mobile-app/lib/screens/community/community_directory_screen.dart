@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
-import '../../data/dummy/community_data.dart';
+import '../../state/app_state.dart';
+import '../../widgets/common/load_status.dart';
 import '../../routes/app_routes.dart';
 import '../../widgets/interactive/chip_filter_bar.dart';
 import '../../widgets/layout/content_section.dart';
@@ -22,16 +23,20 @@ class CommunityDirectoryScreen extends StatefulWidget {
 }
 
 class _CommunityDirectoryScreenState extends State<CommunityDirectoryScreen> {
-  String _filter = CommunityData.filters.first;
+  static const _all = 'Semua';
+  String _filter = _all;
 
   @override
   Widget build(BuildContext context) {
     final navigator = Navigator.of(context);
-    final communities = CommunityData.communities
-        .where(
-          (c) =>
-              _filter == CommunityData.filters.first || c.category == _filter,
-        )
+    final state = AppStateScope.of(context);
+    // Chip kategori dari data yang ada (kategori dikelola admin di dashboard).
+    final filters = [
+      _all,
+      ...{for (final c in state.communities) c.category},
+    ];
+    final communities = state.communities
+        .where((c) => _filter == _all || c.category == _filter)
         .toList();
 
     return TkbjScaffold(
@@ -47,7 +52,7 @@ class _CommunityDirectoryScreenState extends State<CommunityDirectoryScreen> {
         ContentSection(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: ChipFilterBar(
-            options: CommunityData.filters,
+            options: filters,
             selected: _filter,
             padding: const EdgeInsets.symmetric(horizontal: 12),
             onSelected: (value) => setState(() => _filter = value),
@@ -60,7 +65,9 @@ class _CommunityDirectoryScreenState extends State<CommunityDirectoryScreen> {
           ),
         ),
         ContentSection(
-          child: communities.isEmpty
+          child: state.catalogState != LoadState.ready
+              ? LoadStatus.catalog(state)
+              : communities.isEmpty
               ? Text(
                   'Belum ada komunitas untuk kategori ini.',
                   style: AppText.poppins(12, color: AppColors.muted),

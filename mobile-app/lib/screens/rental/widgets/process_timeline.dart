@@ -34,8 +34,8 @@ class ProcessTimeline extends StatelessWidget {
       ),
       (
         'Verifikasi admin',
-        approved && reviewed != null
-            ? 'Disetujui · ${Formatters.dateTime(reviewed)}'
+        approved
+            ? 'Disetujui${reviewed == null ? '' : ' · ${Formatters.dateTime(reviewed)}'}'
             : 'Sedang ditinjau oleh Admin Sewa Gedung',
         approved ? _StepState.done : _StepState.current,
       ),
@@ -44,7 +44,11 @@ class ProcessTimeline extends StatelessWidget {
         switch (status) {
           RentalStatus.paid =>
             'Lunas via ${request.paymentMethod?.shortLabel ?? 'transfer'}',
-          RentalStatus.approved => 'Selesaikan dalam 2×24 jam',
+          RentalStatus.approved when request.isVerifyingPayment =>
+            'Bukti terkirim · sedang diverifikasi Admin Keuangan',
+          RentalStatus.approved =>
+            'Tagihan ${Formatters.rupiah(request.amount)} · unggah bukti '
+                'pembayaran',
           _ => 'Setelah pengajuan disetujui',
         },
         switch (status) {
@@ -55,7 +59,7 @@ class ProcessTimeline extends StatelessWidget {
       ),
       (
         'Bukti reservasi',
-        'Dikirim via email & WhatsApp',
+        'Tersedia di aplikasi setelah lunas',
         status == RentalStatus.paid ? _StepState.done : _StepState.todo,
       ),
     ];

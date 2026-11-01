@@ -8,7 +8,9 @@ import '../../routes/app_routes.dart';
 import '../../state/app_state.dart';
 import '../../widgets/common/app_button.dart';
 import '../../widgets/common/app_card.dart';
+import '../../widgets/common/load_status.dart';
 import '../../widgets/common/pill_badge.dart';
+import '../../widgets/common/refresh_on_open.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/page_header.dart';
 import '../../widgets/layout/responsive_grid.dart';
@@ -20,47 +22,58 @@ class RentalHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rentals = AppStateScope.of(context).rentals;
+    final state = AppStateScope.of(context);
+    final rentals = state.rentals;
     final navigator = Navigator.of(context);
 
-    return TkbjScaffold(
-      children: [
-        PageHeader(
-          breadcrumb: 'Akun Saya / Riwayat Sewa',
-          title: 'Riwayat Sewa Gedung',
-          subtitle: 'Pantau status setiap pengajuan sewa venue Anda.',
-          onBreadcrumbTap: () =>
-              AppRoutes.openFromHome(context, AppRoutes.account),
-        ),
-        ContentSection(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ResponsiveGrid(
-                spacing: 16,
-                children: [
-                  for (final rental in rentals) _RentalCard(rental: rental),
-                ],
-              ),
-              const SizedBox(height: 16),
-              AppButton(
-                label: '+ Ajukan Sewa Baru',
-                onPressed: () {
-                  AppStateScope.read(context).startRental();
-                  navigator.pushNamed(AppRoutes.rental);
-                },
-              ),
-              const SizedBox(height: 16),
-              AppButton.outline(
-                label: '← Kembali ke Akun',
-                onPressed: () =>
-                    AppRoutes.openFromHome(context, AppRoutes.account),
-              ),
-            ],
+    return RefreshOnOpen(
+      child: TkbjScaffold(
+        children: [
+          PageHeader(
+            breadcrumb: 'Akun Saya / Riwayat Sewa',
+            title: 'Riwayat Sewa Gedung',
+            subtitle: 'Pantau status setiap pengajuan sewa venue Anda.',
+            onBreadcrumbTap: () =>
+                AppRoutes.openFromHome(context, AppRoutes.account),
           ),
-        ),
-      ],
+          ContentSection(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (rentals.isEmpty)
+                  LoadStatus(
+                    loading: state.accountLoading,
+                    error: state.accountLoading
+                        ? null
+                        : 'Belum ada pengajuan sewa gedung.',
+                  )
+                else
+                  ResponsiveGrid(
+                    spacing: 16,
+                    children: [
+                      for (final rental in rentals) _RentalCard(rental: rental),
+                    ],
+                  ),
+                const SizedBox(height: 16),
+                AppButton(
+                  label: '+ Ajukan Sewa Baru',
+                  onPressed: () {
+                    AppStateScope.read(context).startRental();
+                    navigator.pushNamed(AppRoutes.rental);
+                  },
+                ),
+                const SizedBox(height: 16),
+                AppButton.outline(
+                  label: '← Kembali ke Akun',
+                  onPressed: () =>
+                      AppRoutes.openFromHome(context, AppRoutes.account),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -74,6 +87,10 @@ class _RentalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final (String action, String route) = switch (rental.status) {
       RentalStatus.paid => ('Lihat Bukti Reservasi', AppRoutes.rentalReceipt),
+      RentalStatus.approved when rental.isVerifyingPayment => (
+        'Lihat Status Pembayaran',
+        AppRoutes.rentalStatus,
+      ),
       RentalStatus.approved => ('Lanjut Bayar Sewa', AppRoutes.rentalPayment),
       RentalStatus.pending => ('Lihat Status', AppRoutes.rentalStatus),
       RentalStatus.rejected => (
@@ -96,7 +113,9 @@ class _RentalCard extends StatelessWidget {
                 ),
               ),
               PillBadge(
-                rental.status.label,
+                rental.isVerifyingPayment
+                    ? 'Pembayaran Diverifikasi'
+                    : rental.status.label,
                 color: rental.status.color,
                 background: rental.status.background,
                 fontSize: 10,
@@ -111,7 +130,7 @@ class _RentalCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '${Formatters.longDate(rental.date)} · ${rental.slot.shortLabel}',
+            '${Formatters.longDate(rental.date)} · ${rental.timeLabel}',
             style: AppText.poppins(11, color: AppColors.muted),
           ),
           const SizedBox(height: 10),
