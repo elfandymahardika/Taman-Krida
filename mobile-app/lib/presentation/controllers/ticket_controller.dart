@@ -60,6 +60,16 @@ class TicketController extends ChangeNotifier implements AccountDataController {
 
   bool get isCartEmpty => cartLines.isEmpty;
 
+  /// Keranjang hanya berisi tiket gratis → checkout tanpa pembayaran.
+  bool get isCartFree =>
+      cartLines.isNotEmpty && cartLines.every((l) => l.event.isFreeTicket);
+
+  /// Tiket gratis & berbayar tercampur: harus dipesan terpisah (server
+  /// juga menolaknya) karena satu pesanan hanya punya satu status bayar.
+  bool get isCartMixed =>
+      cartLines.any((l) => l.event.isFreeTicket) &&
+      cartLines.any((l) => !l.event.isFreeTicket);
+
   // ------------------------------------------------------------- Checkout
 
   BuyerInfo? _buyer;
@@ -105,8 +115,9 @@ class TicketController extends ChangeNotifier implements AccountDataController {
     ];
   }
 
-  /// Buat pesanan dari keranjang (status "Menunggu pembayaran") lalu
-  /// kosongkan keranjang. Melempar `Failure` bila ditolak server (mis.
+  /// Buat pesanan dari keranjang lalu kosongkan keranjang. Tiket berbayar
+  /// berstatus "Menunggu pembayaran"; tiket gratis langsung lunas (e-tiket
+  /// terbit). Melempar `Failure` bila ditolak server (mis.
   /// kuota habis).
   Future<TicketOrder> placeOrder() async {
     final order = await _checkout(cartLines, _buyer);

@@ -268,6 +268,35 @@ class DemoDataSource
     if (lines.isEmpty) {
       throw const ApiException(400, 'Keranjang tiket masih kosong.');
     }
+    final free = lines.every((l) => l.event.isFreeTicket);
+    if (!free && lines.any((l) => l.event.isFreeTicket)) {
+      throw const ApiException(
+        400,
+        'Tiket gratis dan tiket berbayar dipesan terpisah.',
+      );
+    }
+    if (free) {
+      // Tiket gratis: langsung lunas & e-tiket terbit, tanpa pembayaran.
+      final order = _withStatus(
+        TicketOrder(
+          bookingCode: 'TKBJ-${_randomCode(6)}',
+          buyer: buyer,
+          lines: lines,
+          createdAt: DateTime.now(),
+        ),
+        PaymentStatus.paid,
+      );
+      _orders.insert(0, order);
+      _notify(
+        '🎟',
+        'E-tiket gratis terbit',
+        'Tiket gratis ${order.bookingCode} sudah aktif. Tunjukkan kode '
+            'booking saat masuk area acara.',
+        NotificationTarget.tickets,
+        order.bookingCode,
+      );
+      return order;
+    }
     final order = TicketOrder(
       bookingCode: 'TKBJ-${_randomCode(6)}',
       buyer: buyer,
@@ -587,8 +616,9 @@ class DemoDataSource
     }
     if (has(['jam', 'buka', 'alamat', 'lokasi', 'kontak'])) {
       return reply(
-        'TKBJ buka setiap hari pukul 08.00–22.00 WIB di Jl. Soekarno-Hatta '
-        'No. 7, Kota Malang.',
+        'Kantor TKBJ buka Senin–Jumat pukul 08.00–16.00 WIB; Sabtu–Minggu '
+        'hanya dibuka saat ada acara. Alamat: Jl. Soekarno Hatta No. 7, '
+        'Jatimulyo, Lowokwaru, Kota Malang. Telepon (0341) 471509.',
         links: const [
           AssistantLink(
             kind: AssistantLinkKind.profile,
@@ -624,7 +654,7 @@ class DemoDataSource
       final shown = upcoming.take(3).toList();
       return reply(
         'Acara ${category ?? 'terdekat'} di TKBJ:\n'
-        '${[for (final e in shown) '• ${e.title}, ${Formatters.longDate(e.date)} pukul ${e.startTime} di ${e.venueShort}${e.isTicketed ? ' (${Formatters.rupiah(e.price)})' : ' (gratis)'}'].join('\n')}',
+        '${[for (final e in shown) '• ${e.title}, ${Formatters.longDate(e.date)} pukul ${e.startTime} di ${e.venueShort}${e.price > 0 ? ' (${Formatters.rupiah(e.price)})' : e.isFreeTicket ? ' (gratis, ambil tiket)' : ' (gratis, datang langsung)'}'].join('\n')}',
         links: [
           for (final e in shown.take(2))
             AssistantLink(

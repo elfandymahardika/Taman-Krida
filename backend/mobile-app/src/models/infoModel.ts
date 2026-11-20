@@ -1,6 +1,6 @@
 import pool from '../config/db';
+import { adminFileUrl } from '../lib/adminFiles';
 import { RowDataPacket } from 'mysql2';
-import { config } from '../config/env';
 import { RENTAL_RATES } from '../lib/catalog';
 import { iso } from '../lib/format';
 import { SqlValue } from '../lib/http';
@@ -64,15 +64,6 @@ export interface Media {
 
 interface MediaRow extends RowDataPacket, Media {}
 
-/**
- * Unggahan admin: blob publik = URL apa adanya; blob privat (/uploads/<folder>/<nama>) dan berkas lokal
- * (/uploads/<nama>) disajikan API dashboard.
- */
-const mediaUrl = (file: string) => {
-  if (!/^https?:\/\//.test(file)) return `${config.adminPublicUrl}/uploads/${file}`;
-  return process.env.BLOB_ACCESS === 'public' ? file : `${config.adminPublicUrl}/uploads${new URL(file).pathname}`;
-};
-
 /** `photo` = kunci foto bawaan aplikasi; `url` = berkas unggahan admin (disajikan API dashboard). */
 export const toMedia = (m: Media) => ({
   id: m.id,
@@ -81,7 +72,7 @@ export const toMedia = (m: Media) => ({
   date: m.date,
   type: m.type,
   photo: m.photo ?? undefined,
-  url: m.file ? mediaUrl(m.file) : undefined,
+  url: m.file ? adminFileUrl(m.file) : undefined,
   mime: m.mime ?? undefined,
   credit: m.credit,
   description: m.description ?? '',

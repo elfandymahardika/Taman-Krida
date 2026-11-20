@@ -48,7 +48,9 @@ class OrderSummaryCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  Formatters.rupiah(line.subtotal),
+                  line.subtotal == 0
+                      ? 'Gratis'
+                      : Formatters.rupiah(line.subtotal),
                   style: AppText.poppins(
                     13,
                     weight: FontWeight.w700,
@@ -63,12 +65,14 @@ class OrderSummaryCard extends StatelessWidget {
           const SizedBox(height: 12),
           InfoRow(
             label: 'Total Pembayaran',
-            value: Formatters.rupiah(total),
+            value: total == 0 ? 'Gratis' : Formatters.rupiah(total),
             labelStyle: AppText.poppins(14, weight: FontWeight.w700),
             valueStyle: AppText.playfair(18, color: AppColors.maroon),
           ),
-          const SizedBox(height: 16),
-          const SecureNote(),
+          if (total > 0) ...[
+            const SizedBox(height: 16),
+            const SecureNote(),
+          ],
         ],
       ),
     );

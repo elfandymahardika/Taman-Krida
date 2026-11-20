@@ -31,7 +31,7 @@ export function useAksiTiket(ticketed: Event[]) {
       fields: [
         { name: 'acara', label: 'Pilih acara', as: 'select', options: ticketed.map((t) => t.name), defaultValue: e?.name },
         { name: 'quota', label: 'Kuota tiket', type: 'number', min: 1, defaultValue: e?.quota ?? 300, required: true },
-        { name: 'price', label: 'Harga tiket (Rp)', type: 'number', min: 0, step: 1000, defaultValue: e?.price ?? 50000 },
+        { name: 'price', label: 'Harga tiket (Rp)', type: 'number', min: 0, step: 1000, defaultValue: e?.price ?? 50000, hint: 'Isi 0 untuk tiket gratis: pengunjung langsung dapat e-tiket tanpa pembayaran.' },
       ],
     })
 

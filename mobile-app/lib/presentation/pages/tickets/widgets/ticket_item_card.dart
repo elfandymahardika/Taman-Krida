@@ -66,7 +66,9 @@ class TicketItemCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        Formatters.rupiah(event.price),
+                        event.isFreeTicket
+                            ? 'Gratis'
+                            : Formatters.rupiah(event.price),
                         style: AppText.poppins(
                           13,
                           weight: FontWeight.w700,

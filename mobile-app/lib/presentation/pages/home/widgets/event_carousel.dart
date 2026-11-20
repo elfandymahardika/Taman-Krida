@@ -150,7 +150,7 @@ class _EventSlide extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        event.isTicketed
+                        event.price > 0
                             ? Formatters.rupiah(event.price)
                             : 'Gratis',
                         style: AppText.poppins(

@@ -41,7 +41,11 @@ const eventSummary = (e: ReturnType<typeof toEvent>) => ({
   jam: `${e.start}–${e.end} WIB`,
   lokasi: e.venue,
   penyelenggara: e.organizer,
-  tiket: e.ticketed ? { harga: rupiah(e.price), sisa_kursi: e.remaining } : 'Gratis, tanpa tiket',
+  tiket: !e.ticketed
+    ? 'Gratis, tanpa tiket (datang langsung)'
+    : e.price === 0
+      ? { harga: 'Gratis, ambil tiket di aplikasi (kuota terbatas, tanpa pembayaran)', sisa_kursi: e.remaining }
+      : { harga: rupiah(e.price), sisa_kursi: e.remaining },
 });
 
 const cariAcara: Tool = {

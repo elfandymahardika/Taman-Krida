@@ -26,13 +26,15 @@ class EventDetailScreen extends StatelessWidget {
       context,
       builder: (sheetContext) => SheetMessage(
         symbol: '🎟',
-        title: 'Ingin memesan tiket?',
+        title: event.isFreeTicket
+            ? 'Ambil tiket gratis?'
+            : 'Ingin memesan tiket?',
         message:
             '${event.title} · ${Formatters.shortDate(event.date)} · '
-            '${Formatters.rupiah(event.price)} / orang',
+            '${event.isFreeTicket ? 'Gratis, tanpa pembayaran (kursi terbatas)' : '${Formatters.rupiah(event.price)} / orang'}',
         actions: [
           AppButton(
-            label: 'Ya, Pesan Tiket',
+            label: event.isFreeTicket ? 'Ya, Ambil Tiket' : 'Ya, Pesan Tiket',
             onPressed: () {
               context.read<TicketController>().ensureInCart(event.id);
               Navigator.of(sheetContext).pop();
@@ -88,11 +90,15 @@ class EventDetailScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                event.isTicketed ? 'Harga / orang' : 'Tiket masuk',
+                event.isFreeTicket
+                    ? 'Tiket gratis'
+                    : event.isTicketed
+                    ? 'Harga / orang'
+                    : 'Tiket masuk',
                 style: AppText.poppins(11, color: AppColors.muted),
               ),
               Text(
-                event.isTicketed ? Formatters.rupiah(event.price) : 'Gratis',
+                event.price > 0 ? Formatters.rupiah(event.price) : 'Gratis',
                 style: AppText.playfair(18, color: AppColors.maroon),
               ),
             ],
@@ -101,7 +107,9 @@ class EventDetailScreen extends StatelessWidget {
           Expanded(
             child: bookable
                 ? AppButton(
-                    label: 'Pesan Tiket Sekarang',
+                    label: event.isFreeTicket
+                        ? 'Ambil Tiket Gratis'
+                        : 'Pesan Tiket Sekarang',
                     radius: 12,
                     onPressed: () => _confirmOrder(context, event),
                   )
@@ -224,7 +232,11 @@ class _EventInfoCard extends StatelessWidget {
           const SizedBox(height: 10),
           InfoRow(
             label: 'Harga tiket',
-            value: event.isTicketed ? Formatters.rupiah(event.price) : 'Gratis',
+            value: event.price > 0
+                ? Formatters.rupiah(event.price)
+                : event.isFreeTicket
+                ? 'Gratis · ambil tiket'
+                : 'Gratis · datang langsung',
             valueStyle: AppText.playfair(
               18,
               weight: FontWeight.w600,

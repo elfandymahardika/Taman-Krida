@@ -1,14 +1,18 @@
 import { Request, Response } from 'express';
 import { logActivity } from '../lib/activity';
 import { shortDate } from '../lib/format';
-import { assertValid, conflict, FieldErrors, likePattern, notFound, queryText, where } from '../lib/http';
+import { assertValid, badRequest, conflict, FieldErrors, HttpError, likePattern, notFound, queryText, where } from '../lib/http';
+import { matchesSignature, MAX_FILE_SIZE } from '../middleware/upload.middleware';
 import { EVENT_STATUSES, parseQuota } from '../middleware/validator';
+import { storageService } from '../services/storage.service';
 import {
   deleteEvent,
   eventNameTaken,
   findEventById,
   listEvents,
   resetSampleEvents,
+  sampleResetImages,
+  setEventImage,
   toEvent,
   updateEvent,
   updateEventInventory,
@@ -17,6 +21,9 @@ import {
 import { countOrdersForEvent } from '../models/orderModel';
 
 const DEFAULT_PRICE = 50000;
+
+/** Harga dari formulir: kosong → `fallback`; 0 tetap 0 (tiket gratis, pengunjung ambil tiket tanpa bayar). */
+const priceOr = (value: unknown, fallback: number) => (value === undefined || value === null || value === '' ? fallback : Number(value));
 
 async function mustFind(id: string) {
   const event = await findEventById(id);
@@ -57,7 +64,7 @@ export const createEvent = async (req: Request, res: Response) => {
     status: data.status ?? 'Draf',
     quota,
     sold: quota !== null ? 0 : null,
-    price: quota !== null ? Number(data.price || DEFAULT_PRICE) : null,
+    price: quota !== null ? priceOr(data.price, DEFAULT_PRICE) : null,
   });
   await logActivity('event', 'Acara baru ditambahkan', `${res.locals.user.name} · ${data.name}, ${shortDate(data.date)}`);
   res.status(201).json(toEvent((await findEventById(id))!));
@@ -83,7 +90,7 @@ export const replaceEvent = async (req: Request<{ id: string }>, res: Response) 
     status: data.status,
     quota,
     sold: quota !== null ? (current.sold ?? 0) : null,
-    price: quota !== null ? Number(data.price ?? current.price ?? DEFAULT_PRICE) : null,
+    price: quota !== null ? priceOr(data.price, current.price ?? DEFAULT_PRICE) : null,
   });
   await logActivity('event', 'Agenda diperbarui', `${res.locals.user.name} · ${data.name}, ${shortDate(data.date)}`);
   res.json(toEvent((await findEventById(current.id))!));
@@ -131,13 +138,60 @@ export const removeEvent = async (req: Request<{ id: string }>, res: Response) =
   const n = await countOrdersForEvent(current.id);
   if (n) throw conflict(`Acara memiliki ${n} pesanan tiket sehingga tidak dapat dihapus. Tarik publikasinya saja.`);
   await deleteEvent(current.id);
+  if (current.image) await removeStoredImage(current.image);
   await logActivity('event', 'Acara dihapus', `${res.locals.user.name} · ${current.name}`);
   res.status(204).end();
 };
 
+/** Format gambar acara yang diterima (dicek juga isi berkasnya, bukan hanya Content-Type). */
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const IMAGE_ERROR = 'Gambar harus berformat JPG, PNG, atau WEBP.';
+
+/** Berkas lama gagal dihapus tidak boleh menggagalkan permintaan (data acara sudah benar). */
+const removeStoredImage = (key: string) => storageService.deleteFile(key).catch(() => undefined);
+
+/**
+ * Unggah/ganti gambar acara: POST /api/events/:id/image, isi permintaan = berkas mentah
+ * (Content-Type image/jpeg|png|webp, maks. 5 MB), dibaca express.raw() di routes/api.ts.
+ * Disimpan di Vercel Blob folder "acara" atau folder uploads/; gambar lama dihapus.
+ */
+export const uploadEventImage = async (req: Request<{ id: string }>, res: Response) => {
+  const current = await mustFind(req.params.id);
+  const mime = String(req.get('content-type') ?? '').split(';')[0].toLowerCase();
+  if (!IMAGE_TYPES.includes(mime) || !Buffer.isBuffer(req.body)) throw new HttpError(415, IMAGE_ERROR);
+  if (!req.body.length) throw badRequest('Pilih berkas gambar.', { gambar: 'Pilih berkas gambar.' });
+  if (req.body.length > MAX_FILE_SIZE) throw badRequest('Ukuran gambar maksimal 5 MB.', { gambar: 'Maksimal 5 MB.' });
+  if (!matchesSignature(mime, req.body)) throw badRequest(IMAGE_ERROR, { gambar: 'Isi berkas bukan gambar yang valid.' });
+
+  const stored = await storageService.uploadFile(req.body, queryText(req.query.name) || `acara-${current.id}`, mime, 'acara');
+  try {
+    await setEventImage(current.id, stored.fileKey);
+  } catch (error) {
+    // Rollback anti-file yatim: berkas baru dihapus bila data gagal disimpan.
+    await removeStoredImage(stored.fileKey);
+    throw error;
+  }
+  if (current.image) await removeStoredImage(current.image);
+  await logActivity('event', 'Gambar acara diperbarui', `${res.locals.user.name} · ${current.name}`);
+  res.json(toEvent((await findEventById(current.id))!));
+};
+
+/** Hapus gambar unggahan: acara kembali memakai foto bawaan/foto lokasi. */
+export const removeEventImage = async (req: Request<{ id: string }>, res: Response) => {
+  const current = await mustFind(req.params.id);
+  if (current.image) {
+    await setEventImage(current.id, null);
+    await removeStoredImage(current.image);
+    await logActivity('event', 'Gambar acara dihapus', `${res.locals.user.name} · ${current.name}`);
+  }
+  res.json(toEvent((await findEventById(current.id))!));
+};
+
 /** Pulihkan data contoh acara. */
 export const resetEvents = async (_req: Request, res: Response) => {
+  const images = await sampleResetImages();
   await resetSampleEvents();
+  await Promise.all(images.map(removeStoredImage));
   await logActivity('system', 'Data contoh acara dipulihkan', res.locals.user.name);
   res.json((await listEvents()).map(toEvent));
 };

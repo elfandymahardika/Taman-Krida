@@ -2,7 +2,7 @@ import type { EventStatus } from '@prisma/client';
 import { EVENTS } from './data';
 import { day, en, Seeder, time } from './helpers';
 
-/** Agenda September–Oktober 2026. Acara tanpa `quota` = tanpa tiket. */
+/** Agenda 2026 (acara asli TKBJ + acara contoh bertiket). Acara tanpa `quota` = tanpa tiket. */
 export default {
   async up(prisma) {
     const at = new Date('2026-09-01T00:00:00.000Z');

@@ -6,9 +6,8 @@ import { useRouter } from 'next/navigation'
 import { CalendarDays, ChevronRight } from 'lucide-react'
 import { Badge, Card, Photo } from '@/components/ui'
 import { useOverlay } from '@/components/overlay'
-import { PHOTOS } from '@/data/sample'
 import { addDays, dowOf, longDate } from '@/data/format'
-import { sortByDate, timeRange } from '@/data/events'
+import { eventPhoto, sortByDate, timeRange } from '@/data/events'
 import type { Event } from '@/data/events'
 import { eventDetail } from '@/data/eventforms'
 
@@ -66,8 +65,8 @@ export default function AgendaTerdekat({ events, today }: { events: Event[]; tod
               <span className="agenda-item__day">{dowOf(e.date)}</span>
               <span className={`agenda-item__num ${e.date === today ? 'is-today' : ''}`}>{e.date.slice(8)}</span>
             </div>
-            {e.photo ? (
-              <Photo {...PHOTOS[e.photo]} width={66} height={58} radius={6} />
+            {eventPhoto(e) ? (
+              <Photo {...eventPhoto(e)} width={66} height={58} radius={6} />
             ) : (
               <span className="task__icon" style={{ width: 66, height: 58, borderRadius: 6 }}>
                 <CalendarDays strokeWidth={1.75} />

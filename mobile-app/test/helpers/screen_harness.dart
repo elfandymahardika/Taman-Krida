@@ -218,7 +218,7 @@ const screenCases = [
   ScreenCase(
     '24-komunitas-detail',
     AppRoutes.communityDetail,
-    arguments: 'mekar-sari',
+    arguments: 'asmorobangun',
     height: 1320,
   ),
   ScreenCase('25-daftar-komunitas', AppRoutes.communityRegister, height: 1260),

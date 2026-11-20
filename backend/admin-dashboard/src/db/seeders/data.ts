@@ -1,5 +1,12 @@
-// Data contoh awal database. Sama dengan data contoh dashboard sebelumnya,
-// ditambah beberapa data September agar pilihan periode punya isi.
+// Data awal database.
+//
+// DATA ASLI (dicek dari sumber publik, November 2026):
+// - PROFILE, FACILITIES (nama area & keterangan), acara bertanda `// asli` di EVENTS, dan komunitas
+//   berstatus Aktif di COMMUNITIES. Sumber: id.wikipedia.org/wiki/Taman_Krida_Budaya_Kota_Malang,
+//   salsawisata.com, harinikahan.net, TIMES Indonesia, Radar Malang, ANTARA Foto, KabarJatim, RRI Malang.
+// DATA SIMULASI (tidak ada sumber publiknya, jadi tetap contoh):
+// - akun staf, pesanan tiket, sewa gedung, keuangan, catatan, aktivitas, notifikasi, serta acara bertiket.
+//   Acara TKBJ yang asli umumnya gratis, sehingga alur tiket berbayar tetap memakai acara contoh.
 
 /** Waktu lokal WIB → ISO UTC. */
 export const wib = (date: string, time = '00:00') => new Date(`${date}T${time}:00+07:00`).toISOString()
@@ -34,20 +41,27 @@ export const USERS: SeedUser[] = [
 
 export const PROFILE = {
   name: 'Taman Krida Budaya Jawa Timur',
-  manager: 'Dinas Kebudayaan dan Pariwisata Provinsi Jawa Timur',
-  address: 'Jl. Soekarno-Hatta No. 7, Kota Malang',
-  phone: '(0341) 491 234',
-  whatsapp: '0812-3300-1977',
-  hours: 'Setiap hari · 08.00–22.00 WIB',
-  about: 'Pusat kegiatan seni dan budaya Jawa Timur yang menyediakan ruang pertunjukan, pameran, dan latihan bagi komunitas.',
+  manager: 'UPT LPPK Taman Krida Budaya · Dinas Kebudayaan dan Pariwisata Provinsi Jawa Timur',
+  address: 'Jl. Soekarno Hatta No. 7, Jatimulyo, Kec. Lowokwaru, Kota Malang, Jawa Timur 65141',
+  phone: '(0341) 471509',
+  // Belum ada nomor WhatsApp layanan resmi yang dipublikasikan; info acara diumumkan lewat Instagram @disbudparjatimprov.
+  whatsapp: '',
+  hours: 'Senin–Jumat · 08.00–16.00 WIB (Sabtu–Minggu hanya saat ada acara)',
+  about:
+    'Kompleks seni budaya yang dikelola Disbudpar Jatim di Kota Malang seluas 17.050 m² (bangunan 4.103 m²) dengan pendopo beratap joglo, ' +
+    'panggung terbuka, gedung pameran, dan mini museum. Rutin menggelar wayang, ketoprak, sendratari, reog, jaranan, ' +
+    'bantengan, dan Topeng Panji. Masuk gratis.',
 }
 
-/** `bookable` = dipakai sebagai lokasi acara & sewa (namanya dikunci agar data tetap konsisten). */
+/**
+ * `bookable` = dipakai sebagai lokasi acara & sewa (namanya dikunci agar data tetap konsisten).
+ * Kapasitas resmi per area belum dipublikasikan; angka `capacity` tetap perkiraan.
+ */
 export const FACILITIES = [
-  { id: 'pendopo', name: 'Pendopo Agung TKBJ', capacity: 300, purpose: 'Pertunjukan tradisi', photo: 'wayang', bookable: true },
-  { id: 'panggung', name: 'Panggung Terbuka', capacity: 500, purpose: 'Pentas luar ruang', photo: 'topeng', bookable: true },
-  { id: 'galeri', name: 'Gedung Kesenian & Galeri', capacity: 120, purpose: 'Pameran dan lokakarya', photo: 'ketoprak', bookable: true },
-  { id: 'loket', name: 'Area Loket & Parkir', capacity: null, purpose: 'Pintu masuk utama · Loket tiket', photo: null, bookable: false },
+  { id: 'pendopo', name: 'Pendopo Agung TKBJ', capacity: 300, purpose: 'Pendopo beratap joglo (bagian luar & dalam) · wayang, karawitan, Topeng Panji', photo: 'wayang', bookable: true },
+  { id: 'panggung', name: 'Panggung Terbuka', capacity: 500, purpose: 'Pentas luar ruang · reog, jaranan, bantengan, sendratari', photo: 'topeng', bookable: true },
+  { id: 'galeri', name: 'Gedung Kesenian & Galeri', capacity: 120, purpose: 'Gedung pameran & mini museum · batik, kriya, seni rupa, fotografi', photo: 'ketoprak', bookable: true },
+  { id: 'loket', name: 'Area Parkir & Mushola', capacity: null, purpose: 'Parkir (motor Rp2.000) · mushola · kamar mandi · masuk tanpa tiket', photo: null, bookable: false },
 ]
 
 const MB = 1024 * 1024
@@ -75,7 +89,15 @@ export const CONTENTS = [
 
 const PRICE = 50000
 
+// Acara bertanda `// asli` benar-benar digelar di TKBJ (tanggal, nama, penyelenggara dari berita); gratis, jadi tanpa kuota/tiket.
+// Sumber tidak menyebut panggung di dalam kompleks dan sebagian jam selesai, jadi `venue` dan jam yang tidak disebut adalah perkiraan.
 export const EVENTS = [
+  // asli · TIMES Indonesia 22/2/2026: sanggar Setyotomo, Mantraloka, Bayu Candra Kirana, Karimun Art Center, Kamulan Tulus Besar
+  { id: 'ragil-kuning', name: 'Tari Topeng Malangan: Love Hunt for You – Dewi Ragil Kuning', short: 'Topeng Dewi Ragil Kuning', organizer: 'Disbudpar Provinsi Jawa Timur', date: '2026-02-21', start: '19:00', end: '21:00', venue: 'Pendopo Agung TKBJ', status: 'Terpublikasi', photo: 'topeng' },
+  // asli · TIMES Indonesia & Jatim Network: mulai 18.00 WIB, gratis, dibawakan STKW Surabaya
+  { id: 'candrasmara', name: 'Pagelaran Topeng Panji "Candrasmara"', short: 'Topeng Panji Candrasmara', organizer: 'Disbudpar Jatim bersama STKW Surabaya', date: '2026-04-25', start: '18:00', end: '21:00', venue: 'Pendopo Agung TKBJ', status: 'Terpublikasi', photo: 'topeng' },
+  // asli · KabarJatim 1/7/2026: 30 Juni–5 Juli 2026, reog, bantengan, jaranan, topeng, wayang suket, bazar & pameran keris
+  { id: 'malang-djadoel', name: 'Malang Djadoel 3 "Semakin Classic Semakin Asyik" (30 Jun–5 Jul)', short: 'Malang Djadoel 3', organizer: 'Panitia Malang Djadoel', date: '2026-06-30', start: '15:00', end: '22:00', venue: 'Panggung Terbuka', status: 'Terpublikasi', photo: 'topeng' },
   { id: 'sep-reog', name: 'Reog Ponorogo Malam Purnama', short: 'Reog Ponorogo', organizer: 'Paguyuban Reog Singo Barong', date: '2026-09-05', start: '19:00', end: '22:00', venue: 'Panggung Terbuka', status: 'Terpublikasi', sold: 280, quota: 300 },
   { id: 'sep-gamelan', name: 'Konser Gamelan Kontemporer', short: 'Konser gamelan', organizer: 'Paguyuban Sekar Laras', date: '2026-09-12', start: '19:00', end: '21:00', venue: 'Pendopo Agung TKBJ', status: 'Terpublikasi', sold: 190, quota: 250 },
   { id: 'sep-remo', name: 'Gelar Tari Remo', short: 'Tari Remo', organizer: 'Sanggar Tari Mekar Sari', date: '2026-09-19', start: '16:00', end: '18:00', venue: 'Panggung Terbuka', status: 'Terpublikasi' },
@@ -90,8 +112,10 @@ export const EVENTS = [
   { id: 'jaranan', name: 'Jaranan Dor', short: 'Jaranan Dor', organizer: 'Paguyuban Jaranan Turonggo', date: '2026-10-18', start: '15:00', end: '17:00', venue: 'Panggung Terbuka', status: 'Terpublikasi' },
   { id: 'batik', name: 'Lokakarya Batik Malangan', short: 'Lokakarya batik', organizer: 'Komunitas Kriya Tunas', date: '2026-10-21', start: '10:00', end: '13:00', venue: 'Gedung Kesenian & Galeri', status: 'Terpublikasi' },
   { id: 'festival', name: 'Festival Seni Tradisi', short: 'Festival seni', organizer: 'Tim program TKBJ', date: '2026-10-24', start: '09:00', end: '17:00', venue: 'Panggung Terbuka', status: 'Draf' },
-  { id: 'diskusi', name: 'Diskusi Budaya Panji', short: 'Diskusi budaya', organizer: 'Tim program TKBJ', date: '2026-10-28', start: '13:00', end: '15:00', venue: 'Gedung Kesenian & Galeri', status: 'Draf' },
-  { id: 'pentas', name: 'Pentas Akhir Bulan', short: 'Pentas akhir bulan', organizer: 'Tim program TKBJ', date: '2026-10-31', start: '19:00', end: '22:00', venue: 'Pendopo Agung TKBJ', status: 'Draf' },
+  // asli · ANTARA Foto 16/10/2026: memperingati Hari Jadi ke-81 Provinsi Jawa Timur
+  { id: 'ramayana', name: 'Sendratari Ramayana "Sotya Chapter: Shinta Ilang"', short: 'Sendratari Ramayana', organizer: 'Disbudpar Provinsi Jawa Timur', date: '2026-10-16', start: '19:00', end: '21:00', venue: 'Panggung Terbuka', status: 'Terpublikasi', photo: 'wayang' },
+  // asli · Radar Malang 4/11/2026: puncak Hari Wayang Nasional, gratis, gerbang dibuka menjelang malam
+  { id: 'hari-wayang', name: 'Pagelaran Wayang Hari Wayang Nasional', short: 'Hari Wayang Nasional', organizer: 'Disbudpar Provinsi Jawa Timur', date: '2026-11-07', start: '19:00', end: '23:00', venue: 'Pendopo Agung TKBJ', status: 'Terpublikasi', photo: 'wayang' },
 ].map((e) => ({ price: e.quota !== undefined ? PRICE : null, ...e }))
 
 /** Tarif sewa per hari, dipakai saat permintaan sewa disetujui. */
@@ -148,12 +172,18 @@ export const ORDERS: SeedOrder[] = [
   { id: 'TK-1026-0128', type: 'Tiket', customer: 'Rina Wulandari', eventId: 'wayang', qty: 2, amount: 100000, payment: 'Lunas', method: 'QRIS', createdAt: wib('2026-10-02', '09:20'), paidAt: wib('2026-10-02', '09:25') },
 ]
 
+/** Kontak sanggar asli belum dipublikasikan, jadi diarahkan ke kantor pengelola TKBJ. */
+const VIA_TKBJ = '(0341) 471509'
+
+// Komunitas Aktif = sanggar/padepokan Malang Raya yang nyata (TIMES Indonesia, RRI Malang, jurnal Harmonia UNNES,
+// Wikipedia "Topeng Malangan"). Jumlah anggota tidak dipublikasikan → 0 (ditampilkan "–").
+// Yang Nonaktif/Menunggu persetujuan = simulasi alur pendaftaran dari aplikasi.
 export const COMMUNITIES = [
-  { id: 'wahyu', name: "Paguyuban Wayang 'Wahyu Budoyo'", category: 'Seni pertunjukan', city: 'Kota Malang', members: 42, contact: '0813-3456-2201', photo: 'wayang', status: 'Aktif', leader: 'Ki Sugeng Rawuh', since: 'Berdiri 1998' },
-  { id: 'mekar', name: 'Sanggar Tari Mekar Sari', category: 'Seni tari tradisional', city: 'Kab. Malang', members: 65, contact: '0812-4410-8823', photo: 'topeng', status: 'Aktif', leader: 'Sri Rahayu', since: 'Berdiri 2004' },
-  { id: 'guyub', name: "Komunitas Ketoprak 'Guyub Rukun'", category: 'Seni pertunjukan', city: 'Kota Batu', members: 38, contact: '0857-3012-7745', photo: 'ketoprak', status: 'Aktif', leader: 'Bambang Sutejo', since: 'Berdiri 2010' },
-  { id: 'sekar', name: 'Paguyuban Sekar Laras', category: 'Seni musik', city: 'Kota Malang', members: 27, contact: '0821-3390-1102', photo: 'wayang', status: 'Aktif', leader: 'Hadi Purnomo', since: 'Berdiri 2012' },
-  { id: 'ludruk', name: 'Kelompok Ludruk Karya Budaya', category: 'Seni pertunjukan', city: 'Kab. Malang', members: 31, contact: '0813-5520-4410', photo: 'ketoprak', status: 'Aktif', leader: 'Cak Kartolo', since: 'Berdiri 2001' },
+  { id: 'asmorobangun', name: 'Padepokan Seni Topeng Asmorobangun', category: 'Seni tari tradisional', city: 'Kedungmonggo, Pakisaji, Kab. Malang', members: 0, contact: VIA_TKBJ, photo: 'topeng', status: 'Aktif', leader: 'Tri Handoyo', since: 'Berdiri awal abad ke-20' },
+  { id: 'mangun-dharmo', name: 'Padepokan Seni Mangun Dharmo', category: 'Seni pertunjukan', city: 'Tulus Besar, Tumpang, Kab. Malang', members: 0, contact: VIA_TKBJ, photo: 'wayang', status: 'Aktif', leader: 'Ki Soleh Adi Pramono', since: 'Berdiri 1989' },
+  { id: 'mantraloka', name: 'Sanggar Mantraloka', category: 'Seni pertunjukan', city: 'Kemantren, Jabung, Kab. Malang', members: 0, contact: VIA_TKBJ, photo: 'topeng', status: 'Aktif', leader: null, since: 'Berdiri 2018' },
+  { id: 'setyotomo', name: 'Sanggar Setyotomo', category: 'Seni tari tradisional', city: 'Glagah Dowo, Tumpang, Kab. Malang', members: 0, contact: VIA_TKBJ, photo: 'topeng', status: 'Aktif', leader: 'Budi Utomo', since: null },
+  { id: 'bayu-candra-kirana', name: 'Sanggar Bayu Candra Kirana', category: 'Seni tari tradisional', city: 'Senggreng, Sumberpucung, Kab. Malang', members: 0, contact: VIA_TKBJ, photo: 'topeng', status: 'Aktif', leader: null, since: null },
   { id: 'turonggo', name: 'Paguyuban Jaranan Turonggo', category: 'Seni tari tradisional', city: 'Kab. Blitar', members: 45, contact: '0852-3301-7789', photo: 'topeng', status: 'Nonaktif', leader: 'Mbah Suroso', since: 'Berdiri 1995' },
   { id: 'arum', name: 'Sanggar Sekar Arum', category: 'Seni tari tradisional', city: 'Kab. Pasuruan', members: 24, contact: '0812-3344-5566', photo: 'topeng', status: 'Menunggu persetujuan', leader: 'Endang Sulistyowati', since: 'Berdiri 2015', appliedAt: wib('2026-10-01', '14:20') },
   { id: 'tunas', name: 'Komunitas Kriya Tunas', category: 'Seni kriya', city: 'Kota Malang', members: 18, contact: '0856-7788-9900', photo: 'wayang', status: 'Menunggu persetujuan', leader: 'Rudi Hartono', since: 'Berdiri 2019', appliedAt: wib('2026-09-30', '10:45') },

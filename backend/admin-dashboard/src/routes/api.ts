@@ -60,6 +60,13 @@ router.post('/events/reset', eventsEdit, events.resetEvents);
 router.get('/events/:id', requireView('events'), events.getEvent);
 router.put('/events/:id', eventsEdit, validateEvent, events.replaceEvent);
 router.patch('/events/:id', eventsEdit, events.patchEvent);
+router.post(
+  '/events/:id/image',
+  eventsEdit,
+  express.raw({ type: 'image/*', limit: '6mb' }),
+  events.uploadEventImage,
+);
+router.delete('/events/:id/image', eventsEdit, events.removeEventImage);
 router.delete('/events/:id', eventsEdit, events.removeEvent);
 
 // Transaksi (daftar pesanan tiket juga boleh dibaca peran Acara, dicek di controller)

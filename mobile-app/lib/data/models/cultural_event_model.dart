@@ -36,7 +36,7 @@ class CulturalEventModel extends CulturalEvent {
       description:
           '${j['name']} dipersembahkan oleh $organizer di $venue, Taman '
           'Krida Budaya Jawa Timur. '
-          '${ticketed ? 'Tiket terbatas, pesan lebih awal agar kebagian kursi.' : 'Terbuka untuk umum tanpa tiket.'}',
+          '${!ticketed ? 'Gratis dan terbuka untuk umum tanpa tiket, datang langsung.' : j['price'] == 0 ? 'Gratis, tetapi kursi terbatas: ambil tiket gratis lewat aplikasi.' : 'Tiket terbatas, pesan lebih awal agar kebagian kursi.'}',
       date: DateTime.parse(j['date'] as String),
       startTime: j['start'] as String,
       endTime: j['end'] as String,

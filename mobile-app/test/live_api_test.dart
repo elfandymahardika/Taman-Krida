@@ -81,7 +81,7 @@ void main() {
     expect(pendopo.mapPosition, isNotNull);
     expect(state.catalog.facilityById('loket')!.isRentable, isFalse);
     expect(state.catalog.gallery, isNotEmpty);
-    expect(state.catalog.communities.map((c) => c.id), contains('mekar'));
+    expect(state.catalog.communities.map((c) => c.id), contains('asmorobangun'));
     expect(
       state.catalog.communityCategories,
       contains('Seni tari tradisional'),

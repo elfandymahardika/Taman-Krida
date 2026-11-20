@@ -16,6 +16,9 @@ const SIGNATURES: Record<string, (b: Buffer) => boolean> = {
   'application/pdf': (b) => b.toString('latin1', 0, 5) === '%PDF-',
 };
 
+/** Isi berkas cocok dengan formatnya (magic number)? Dipakai juga unggahan mentah (express.raw). */
+export const matchesSignature = (mime: string, buffer: Buffer) => Boolean(SIGNATURES[mime]?.(buffer));
+
 // memoryStorage: file ditampung sementara di Buffer RAM untuk divalidasi lalu dikirim ke storage service.
 const rawUpload = multer({
   storage: multer.memoryStorage(),

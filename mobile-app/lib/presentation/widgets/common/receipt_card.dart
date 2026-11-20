@@ -23,12 +23,16 @@ class ReceiptCard extends StatelessWidget {
     required this.rows,
     required this.codeLabel,
     required this.code,
+    this.badge = 'LUNAS / PAID',
   });
 
   final String title;
   final List<ReceiptRow> rows;
   final String codeLabel;
   final String code;
+
+  /// Label status di pojok kartu, mis. "TIKET GRATIS".
+  final String badge;
 
   @override
   Widget build(BuildContext context) {
@@ -57,12 +61,15 @@ class ReceiptCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const PillBadge(
-                  'LUNAS / PAID',
+                PillBadge(
+                  badge,
                   fontSize: 10,
                   weight: FontWeight.w700,
                   radius: 6,
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                 ),
               ],
             ),

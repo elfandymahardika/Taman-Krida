@@ -24,6 +24,14 @@ class TicketListScreen extends StatelessWidget {
       showAppToast(context, 'Pilih minimal 1 tiket terlebih dahulu.');
       return;
     }
+    if (ticketController.isCartMixed) {
+      showAppToast(
+        context,
+        'Tiket gratis dan tiket berbayar dipesan terpisah. Kosongkan salah '
+        'satunya dulu.',
+      );
+      return;
+    }
     Navigator.of(context).pushNamed(AppRoutes.checkoutBuyer);
   }
 
@@ -48,7 +56,9 @@ class TicketListScreen extends StatelessWidget {
               AnimatedSwitcher(
                 duration: const Duration(milliseconds: 200),
                 child: Text(
-                  Formatters.rupiah(ticketController.cartTotal),
+                  ticketController.isCartFree
+                      ? 'Gratis'
+                      : Formatters.rupiah(ticketController.cartTotal),
                   key: ValueKey(ticketController.cartTotal),
                   style: AppText.playfair(18, color: AppColors.maroon),
                 ),
@@ -58,7 +68,9 @@ class TicketListScreen extends StatelessWidget {
           const SizedBox(width: 16),
           Expanded(
             child: AppButton(
-              label: 'Lanjut ke Pembayaran',
+              label: ticketController.isCartFree
+                  ? 'Ambil Tiket Gratis'
+                  : 'Lanjut ke Pembayaran',
               radius: 12,
               onPressed: () => _continue(context, ticketController),
             ),
@@ -132,7 +144,9 @@ class TicketListScreen extends StatelessWidget {
                       label:
                           '${line.event.shortTitle.split(':').first} '
                           '(${line.quantity} Tiket)',
-                      value: Formatters.rupiah(line.subtotal),
+                      value: line.event.isFreeTicket
+                          ? 'Gratis'
+                          : Formatters.rupiah(line.subtotal),
                       fontSize: 13,
                     ),
                   ],

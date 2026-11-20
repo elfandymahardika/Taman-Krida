@@ -143,6 +143,13 @@ class _StatusHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final payBefore = order.payBefore;
     final (symbol, color, title, message) = switch (order.status) {
+      PaymentStatus.paid when order.total == 0 => (
+        '✓',
+        AppColors.success,
+        'Tiket Gratis Aktif!',
+        'Tiket gratis terbit tanpa pembayaran. Tunjukkan kode booking '
+            '${order.bookingCode} saat masuk area acara.',
+      ),
       PaymentStatus.paid => (
         '✓',
         AppColors.success,

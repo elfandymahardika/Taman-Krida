@@ -67,13 +67,15 @@ abstract final class DummyData {
       description:
           'Pameran karya batik tulis dan kriya dari perajin seluruh Jawa '
           'Timur, lengkap dengan demonstrasi membatik dan lokakarya singkat '
-          'untuk pengunjung. Terbuka untuk umum tanpa tiket.',
+          'untuk pengunjung. Gratis, tetapi kursi lokakarya terbatas: ambil '
+          'tiket gratis lewat aplikasi.',
       date: DateTime(2026, 6, 14),
       startTime: '09:00',
       endTime: '16:00',
       venue: 'Gedung Kesenian & Galeri',
       venueShort: 'Gedung Kesenian',
       imageAsset: AppImages.fasilitasGedung,
+      // Pola 1: tiket gratis (kuota diisi, harga 0) → e-tiket tanpa bayar.
       price: 0,
       quotaTotal: 200,
       quotaLeft: 200,
@@ -97,6 +99,29 @@ abstract final class DummyData {
       price: 30000,
       quotaTotal: 200,
       quotaLeft: 96,
+    ),
+    // Pola 2: gratis tanpa tiket (kuota 0) → datang langsung.
+    // Acara asli TKBJ (KabarJatim, 1 Juli 2026).
+    CulturalEvent(
+      id: 'malang-djadoel-3',
+      category: 'Tari',
+      title: 'Malang Djadoel 3: Semakin Classic Semakin Asyik',
+      shortTitle: 'Malang Djadoel 3',
+      performer: 'Panitia Malang Djadoel',
+      description:
+          'Festival nostalgia budaya dan kuliner tempo dulu selama enam hari '
+          '(30 Juni–5 Juli 2026): reog, bantengan, jaranan, Tari Topeng '
+          'Malang, wayang suket, bazar barang antik, dan pameran keris. '
+          'Gratis dan terbuka untuk umum tanpa tiket, datang langsung.',
+      date: DateTime(2026, 6, 30),
+      startTime: '15:00',
+      endTime: '22:00',
+      venue: 'Panggung Terbuka',
+      venueShort: 'Terbuka',
+      imageAsset: AppImages.fasilitasPanggung,
+      price: 0,
+      quotaTotal: 0,
+      quotaLeft: 0,
     ),
   ];
 

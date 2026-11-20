@@ -16,8 +16,8 @@ export default function DaftarKomunitas({ communities, loaded }: { communities: 
         ['Kategori', c.category],
         ['Domisili', c.city],
         ['Ketua', c.leader ?? '—'],
-        ['Anggota', `${c.members} orang`],
-        ['Kontak WhatsApp', c.contact],
+        ['Anggota', c.members ? `${c.members} orang` : '—'],
+        ['Kontak', c.contact],
         ['Status', c.status],
       ],
       primaryLabel: c.status === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan',
@@ -37,7 +37,7 @@ export default function DaftarKomunitas({ communities, loaded }: { communities: 
                 {c.category} · {c.city}
               </span>
               <span>
-                {c.members} anggota · WA {c.contact}
+                {c.members ? `${c.members} anggota · ` : ''}Kontak {c.contact}
               </span>
             </div>
             <div className="community__side">

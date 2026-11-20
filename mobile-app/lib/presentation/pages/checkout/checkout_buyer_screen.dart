@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/error/failure.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/utils/validators.dart';
@@ -8,6 +9,7 @@ import '../../../domain/entities/ticket_order.dart';
 import '../../routes/app_routes.dart';
 import '../../controllers/controllers.dart';
 import '../../widgets/common/app_button.dart';
+import '../../widgets/common/app_feedback.dart';
 import '../../widgets/form/labeled_text_field.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
@@ -16,6 +18,9 @@ import 'widgets/empty_cart_notice.dart';
 import 'widgets/order_summary_card.dart';
 
 /// Checkout langkah 1: isi data pemesan (node 1:681).
+///
+/// Keranjang tiket gratis langsung dipesan dari sini (tanpa langkah
+/// pembayaran) dan e-tiket terbit di layar Status Pesanan.
 class CheckoutBuyerScreen extends StatefulWidget {
   const CheckoutBuyerScreen({super.key});
 
@@ -29,6 +34,7 @@ class _CheckoutBuyerScreenState extends State<CheckoutBuyerScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _prefilled = false;
+  bool _busy = false;
 
   @override
   void didChangeDependencies() {
@@ -53,29 +59,51 @@ class _CheckoutBuyerScreenState extends State<CheckoutBuyerScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    context.read<TicketController>().saveBuyer(
+    final ticketController = context.read<TicketController>();
+    ticketController.saveBuyer(
       BuyerInfo(
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
       ),
     );
-    Navigator.of(context).pushNamed(AppRoutes.checkoutPayment);
+    if (!ticketController.isCartFree) {
+      Navigator.of(context).pushNamed(AppRoutes.checkoutPayment);
+      return;
+    }
+    // Tiket gratis: pesanan langsung lunas, lewati pembayaran.
+    setState(() => _busy = true);
+    try {
+      final order = await ticketController.placeOrder();
+      if (!mounted) return;
+      Navigator.of(context).pushNamedAndRemoveUntil(
+        AppRoutes.checkoutSuccess,
+        (route) => route.isFirst,
+        arguments: order.bookingCode,
+      );
+    } on Failure catch (e) {
+      if (mounted) showAppToast(context, e.displayMessage);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final ticketController = context.watch<TicketController>();
+    final free = ticketController.isCartFree;
 
     return TkbjScaffold(
-      title: 'Proses Pembayaran',
-      subtitle:
-          'Selesaikan pemesanan tiket pertunjukan Anda dengan mengisi data '
-          'pemesan resmi di bawah ini.',
+      title: free ? 'Ambil Tiket Gratis' : 'Proses Pembayaran',
+      subtitle: free
+          ? 'Isi data pemesan. Tiket gratis tidak perlu dibayar: e-tiket '
+                'langsung terbit setelah Anda menekan tombol di bawah.'
+          : 'Selesaikan pemesanan tiket pertunjukan Anda dengan mengisi data '
+                'pemesan resmi di bawah ini.',
       children: [
-        const StepTracker(current: 1),
+        if (!free) const StepTracker(current: 1),
         ContentSection(
           child: ticketController.isCartEmpty
               ? const EmptyCartNotice()
@@ -124,9 +152,13 @@ class _CheckoutBuyerScreenState extends State<CheckoutBuyerScreen> {
                       ),
                       const SizedBox(height: 20),
                       AppButton(
-                        label: 'Lanjutkan Pembayaran →',
+                        label: _busy
+                            ? 'Memproses…'
+                            : free
+                            ? 'Ambil Tiket Gratis →'
+                            : 'Lanjutkan Pembayaran →',
                         fontSize: 13,
-                        onPressed: _submit,
+                        onPressed: _busy ? null : _submit,
                       ),
                     ],
                   ),

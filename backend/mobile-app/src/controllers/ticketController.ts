@@ -2,12 +2,13 @@ import { randomInt, randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { transaction } from '../config/db';
 import { config } from '../config/env';
+import { adminFileUrl } from '../lib/adminFiles';
 import { PAYMENT_LABELS } from '../lib/catalog';
 import { hhmm, iso, rupiah } from '../lib/format';
 import { badRequest, conflict, FieldErrors, notFound, retryOnDuplicate } from '../lib/http';
 import { fileLabel, originalName, removeFiles, saveFile } from '../lib/storage';
 import { getSettings, logActivity, maxTickets, notifyAdmin, payDeadlineHours } from '../models/adminModel';
-import { findPublishedEvent, isTicketed, remainingOf } from '../models/eventModel';
+import { addTicketsSold, findPublishedEvent, isFreeTicket, isTicketed, remainingOf } from '../models/eventModel';
 import { insertFile, listFiles, toFile } from '../models/fileModel';
 import { insertNotification } from '../models/notificationModel';
 import {
@@ -52,7 +53,7 @@ function toBooking(orders: VisitorOrder[], holdHours: number) {
       start: o.event_start ? hhmm(o.event_start) : undefined,
       end: o.event_end ? hhmm(o.event_end) : undefined,
       venue: o.event_venue ?? undefined,
-      photo: o.event_photo ?? undefined,
+      photo: o.event_image ? adminFileUrl(o.event_image) : (o.event_photo ?? undefined),
       qty: o.qty ?? 0,
       price: o.qty ? Math.round(o.amount / o.qty) : o.amount,
       subtotal: o.amount,
@@ -88,7 +89,10 @@ async function mustFindBooking(visitorId: number, code: string) {
 }
 
 /**
- * Checkout keranjang: satu pesanan (baris `orders`, status "Menunggu bayar") per acara, dikelompokkan dalam satu kode booking.
+ * Checkout keranjang: satu pesanan (baris `orders`) per acara, dikelompokkan dalam satu kode booking.
+ * - Berbayar → "Menunggu bayar", pengunjung mengunggah bukti, Admin Keuangan memverifikasi.
+ * - Tiket gratis (kuota diisi, harga 0) → langsung "Lunas", kuota terpakai, e-tiket terbit tanpa pembayaran.
+ * Tiket gratis dan berbayar tidak boleh dalam satu keranjang (status booking harus satu).
  * Baris acara dikunci selama transaksi agar dua checkout bersamaan tidak melampaui kuota.
  */
 export const checkout = async (req: Request, res: Response) => {
@@ -114,6 +118,9 @@ export const checkout = async (req: Request, res: Response) => {
         events.push(event!);
       }
       if (Object.keys(errors).length) throw badRequest('Pesanan tidak dapat diproses.', errors);
+      const free = events.every(isFreeTicket);
+      if (!free && events.some(isFreeTicket))
+        throw badRequest('Tiket gratis dan tiket berbayar dipesan terpisah.', { items: 'Pesan tiket gratis dan tiket berbayar dalam pesanan yang berbeda.' });
 
       let number = await lastTicketNumber(conn);
       const ids: string[] = [];
@@ -121,22 +128,34 @@ export const checkout = async (req: Request, res: Response) => {
         const event = events[i];
         const id = `TK-${monthPrefix()}-${String(++number).padStart(4, '0')}`;
         await insertTicketOrder(
-          { id, customer: buyer.name, eventId: event.id, service: event.name, serviceDate: event.date, qty: item.qty, amount: event.price! * item.qty },
+          { id, customer: buyer.name, eventId: event.id, service: event.name, serviceDate: event.date, qty: item.qty, amount: event.price! * item.qty, free },
           conn,
         );
-        await linkVisitorOrder({ orderId: id, visitorId: visitor.id, bookingCode: code, email: buyer.email, phone: buyer.phone }, conn);
+        if (free) await addTicketsSold(event.id, item.qty, conn);
+        await linkVisitorOrder(
+          { orderId: id, visitorId: visitor.id, bookingCode: code, email: buyer.email, phone: buyer.phone, status: free ? 'Lunas' : 'Menunggu bayar' },
+          conn,
+        );
         ids.push(id);
       }
-      await logActivity('payment', 'Pesanan tiket dari aplikasi', `${buyer.name} · ${ids.join(', ')}`, conn);
+      await logActivity('payment', free ? 'Tiket gratis diambil dari aplikasi' : 'Pesanan tiket dari aplikasi', `${buyer.name} · ${ids.join(', ')}`, conn);
       await insertNotification(
         visitor.id,
-        {
-          symbol: '⏰',
-          title: 'Selesaikan pembayaran tiket',
-          body: `Pesanan ${code} menunggu pembayaran. Unggah bukti transfer dalam ${holdHours} jam agar kursi tidak dilepas.`,
-          target: 'tickets',
-          targetId: code,
-        },
+        free
+          ? {
+              symbol: '🎟',
+              title: 'E-tiket gratis terbit',
+              body: `Tiket gratis ${code} sudah aktif. Tunjukkan kode booking saat masuk area acara.`,
+              target: 'tickets',
+              targetId: code,
+            }
+          : {
+              symbol: '⏰',
+              title: 'Selesaikan pembayaran tiket',
+              body: `Pesanan ${code} menunggu pembayaran. Unggah bukti transfer dalam ${holdHours} jam agar kursi tidak dilepas.`,
+              target: 'tickets',
+              targetId: code,
+            },
         conn,
       );
       return ids;

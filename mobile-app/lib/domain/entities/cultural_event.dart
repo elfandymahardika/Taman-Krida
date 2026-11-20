@@ -35,10 +35,20 @@ class CulturalEvent {
   final String venueShort;
   final String imageAsset;
 
-  /// Harga per tiket dalam rupiah. 0 berarti acara gratis tanpa tiket.
+  /// Harga per tiket dalam rupiah. 0 berarti gratis.
   final int price;
+
+  /// Kuota tiket. 0 berarti acara tanpa tiket (pengunjung datang langsung).
   final int quotaTotal;
   final int quotaLeft;
 
-  bool get isTicketed => price > 0;
+  /// Acara yang tiketnya dipesan lewat aplikasi (punya kuota), berbayar
+  /// maupun gratis.
+  bool get isTicketed => quotaTotal > 0;
+
+  /// Tiket gratis: pesan tanpa pembayaran, e-tiket langsung terbit.
+  bool get isFreeTicket => isTicketed && price == 0;
+
+  /// Acara gratis tanpa tiket: pengunjung datang langsung.
+  bool get isWalkIn => !isTicketed;
 }

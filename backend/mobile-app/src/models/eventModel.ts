@@ -1,5 +1,6 @@
 import pool, { Queryable } from '../config/db';
 import { RowDataPacket } from 'mysql2';
+import { adminFileUrl } from '../lib/adminFiles';
 import { eventCategory } from '../lib/catalog';
 import { hhmm, iso } from '../lib/format';
 import { SqlValue } from '../lib/http';
@@ -19,6 +20,8 @@ export interface Event {
   sold: number | null;
   price: number | null;
   photo: string | null;
+  /** Gambar unggahan admin (nama berkas / URL Vercel Blob); diutamakan daripada `photo`. */
+  image: string | null;
   updated_at: string;
   /** Tiket dalam pesanan yang belum lunas tapi masih menahan kursi (lihat reservedSql). */
   reserved: number;
@@ -26,8 +29,20 @@ export interface Event {
 
 export interface EventRow extends RowDataPacket, Event {}
 
-/** Acara bertiket = admin mengisi kuota dan harga. */
+/**
+ * Dua pola acara gratis:
+ * - kuota kosong → tanpa tiket, pengunjung datang langsung (`isTicketed` false);
+ * - kuota diisi + harga 0 → tiket gratis: pesanan langsung lunas & e-tiket terbit tanpa pembayaran.
+ */
 export const isTicketed = (e: Event) => e.quota != null && e.price != null;
+
+/** Acara bertiket gratis (kuota diisi, harga 0). */
+export const isFreeTicket = (e: Event) => isTicketed(e) && Number(e.price) === 0;
+
+/** Tiket gratis langsung terhitung terjual (pesanan gratis tidak melewati verifikasi admin). */
+export const addTicketsSold = async (eventId: string, qty: number, db: Queryable) => {
+  await db.execute('UPDATE events SET sold = COALESCE(sold, 0) + ? WHERE id = ?', [qty, eventId]);
+};
 
 /** Sisa kursi: kuota − terjual (lunas) − sedang dipesan. */
 export const remainingOf = (e: Event) => (isTicketed(e) ? Math.max(0, e.quota! - (e.sold ?? 0) - Number(e.reserved)) : null);
@@ -43,8 +58,11 @@ export const toEvent = (e: Event) => ({
   start: hhmm(e.start_time),
   end: hhmm(e.end_time),
   venue: e.venue,
-  photo: e.photo ?? undefined,
+  // `photo` = kunci foto bawaan (wayang/topeng/ketoprak) atau URL gambar unggahan admin; aplikasi memuat
+  // keduanya (Visuals.photo menerima URL http).
+  photo: e.image ? adminFileUrl(e.image) : (e.photo ?? undefined),
   ticketed: isTicketed(e),
+  free: !isTicketed(e) || isFreeTicket(e),
   price: e.price ?? 0,
   quota: e.quota ?? undefined,
   remaining: remainingOf(e) ?? undefined,

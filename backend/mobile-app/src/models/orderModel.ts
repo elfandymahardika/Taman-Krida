@@ -32,13 +32,14 @@ export interface VisitorOrder {
   event_end: string | null;
   event_venue: string | null;
   event_photo: string | null;
+  event_image: string | null;
 }
 
 interface VisitorOrderRow extends RowDataPacket, VisitorOrder {}
 
 const SELECT = `
   SELECT o.*, vo.booking_code, vo.buyer_email, vo.buyer_phone, vo.notified_status,
-         e.short AS event_short, e.start_time AS event_start, e.end_time AS event_end, e.venue AS event_venue, e.photo AS event_photo
+         e.short AS event_short, e.start_time AS event_start, e.end_time AS event_end, e.venue AS event_venue, e.photo AS event_photo, e.image AS event_image
   FROM visitor_orders vo
   JOIN orders o ON o.id = vo.order_id
   LEFT JOIN events e ON e.id = o.event_id`;
@@ -73,27 +74,37 @@ export const lastTicketNumber = async (db: Queryable = pool) => {
   return Number(row.last ?? 0);
 };
 
-/** Pesanan tiket baru dari aplikasi: belum dibayar, masuk menu Transaksi di dashboard. */
+/** Metode yang dicatat di menu Transaksi untuk tiket gratis. */
+export const FREE_METHOD = 'Gratis';
+
+/**
+ * Pesanan tiket baru dari aplikasi, masuk menu Transaksi di dashboard.
+ * Berbayar → "Menunggu bayar". Gratis (`free`) → langsung "Lunas" dengan metode "Gratis".
+ */
 export const insertTicketOrder = async (
-  o: { id: string; customer: string; eventId: string; service: string; serviceDate: string; qty: number; amount: number },
+  o: { id: string; customer: string; eventId: string; service: string; serviceDate: string; qty: number; amount: number; free?: boolean },
   db: Queryable,
 ) => {
+  const now = new Date();
   await db.execute(
-    `INSERT INTO orders (id, type, customer, event_id, service, service_date, qty, amount, payment, created_at)
-     VALUES (?, 'Tiket', ?, ?, ?, ?, ?, ?, 'Menunggu bayar', ?)`,
-    [o.id, o.customer, o.eventId, o.service, o.serviceDate, o.qty, o.amount, new Date()],
+    `INSERT INTO orders (id, type, customer, event_id, service, service_date, qty, amount, payment, method, paid_at, created_at)
+     VALUES (?, 'Tiket', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      o.id, o.customer, o.eventId, o.service, o.serviceDate, o.qty, o.amount,
+      o.free ? 'Lunas' : 'Menunggu bayar', o.free ? FREE_METHOD : null, o.free ? now : null, now,
+    ],
   );
 };
 
 export const linkVisitorOrder = async (
-  l: { orderId: string; visitorId: number; bookingCode: string; email: string; phone: string },
+  l: { orderId: string; visitorId: number; bookingCode: string; email: string; phone: string; status?: PaymentStatus },
   db: Queryable,
 ) => {
   // REPLACE: id pesanan bisa terpakai ulang setelah data dashboard di-seed ulang (tautan lama ikut tertimpa).
   await db.execute(
     `REPLACE INTO visitor_orders (order_id, visitor_id, booking_code, buyer_email, buyer_phone, notified_status, created_at)
-     VALUES (?, ?, ?, ?, ?, 'Menunggu bayar', ?)`,
-    [l.orderId, l.visitorId, l.bookingCode, l.email, l.phone, new Date()],
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [l.orderId, l.visitorId, l.bookingCode, l.email, l.phone, l.status ?? 'Menunggu bayar', new Date()],
   );
 };
 

@@ -157,10 +157,10 @@ describe('informasi publik', () => {
     assert.ok((await call('/gallery/collections')).body.some((c: any) => c.name === 'Pertunjukan Oktober'));
 
     const communities = (await call('/communities')).body;
-    assert.ok(communities.some((c: any) => c.id === 'mekar'));
+    assert.ok(communities.some((c: any) => c.id === 'asmorobangun'));
     assert.ok(!communities.some((c: any) => ['arum', 'turonggo'].includes(c.id)), 'yang menunggu/nonaktif tidak tampil');
     assert.equal((await call('/communities/arum')).status, 404);
-    assert.equal((await call('/communities?category=Seni musik')).body.length, 1);
+    assert.equal((await call('/communities?category=Seni pertunjukan')).body.length, 2);
 
     const facilities = (await call('/facilities')).body;
     assert.equal(facilities.find((f: any) => f.id === 'pendopo').rentalRate, 2500000);
@@ -763,5 +763,69 @@ describe('Tanya Krida (asisten AI)', () => {
     assert.equal(off.status, 503);
     assert.match(off.body.error, /belum diaktifkan/);
     process.env.GEMINI_API_KEY = 'kunci-gemini';
+  });
+});
+
+describe('acara gratis (dua pola)', () => {
+  test('kuota diisi + harga 0 → tiket gratis langsung lunas; kuota kosong → datang langsung tanpa tiket', async () => {
+    const sari = await login('sari.wulandari@email.com');
+
+    // Pola 2: kuota kosong → tanpa tiket, tidak bisa dipesan.
+    const walkIn = (await call('/events/kriya')).body;
+    assert.equal(walkIn.ticketed, false);
+    assert.equal(walkIn.free, true);
+
+    // Admin mengubah acara menjadi tiket gratis (kuota 50, harga 0) lewat API dashboard; harga 0 tidak boleh jadi Rp50.000.
+    const patch = await adminCall('/events/kriya', { method: 'PATCH', body: { quota: 50, price: 0 } });
+    assert.equal(patch.status, 200);
+    assert.equal(patch.body.price, 0);
+    const freeEvent = (await call('/events/kriya')).body;
+    assert.equal(freeEvent.ticketed, true);
+    assert.equal(freeEvent.price, 0);
+    assert.equal(freeEvent.remaining, 50);
+
+    // Tiket gratis & berbayar tidak boleh dalam satu pesanan.
+    const mixed = await call('/tickets/checkout', { method: 'POST', token: sari, body: { items: [{ eventId: 'kriya', qty: 1 }, { eventId: 'wayang', qty: 1 }] } });
+    assert.equal(mixed.status, 400);
+    assert.match(mixed.body.error, /dipesan terpisah/);
+
+    // Pola 1: tiket gratis → langsung Lunas, e-tiket terbit, kuota terpakai, tanpa unggah bukti.
+    const res = await call('/tickets/checkout', { method: 'POST', token: sari, body: { items: [{ eventId: 'kriya', qty: 2 }] } });
+    assert.equal(res.status, 201);
+    assert.equal(res.body.payment, 'Lunas');
+    assert.equal(res.body.total, 0);
+    assert.equal(res.body.method, 'Gratis');
+    assert.equal(res.body.payBefore, undefined);
+    assert.equal(res.body.lines[0].ticketCodes.length, 2);
+    assert.equal((await queryOne('SELECT sold FROM events WHERE id = ?', ['kriya'])).sold, 2);
+    assert.equal((await call('/events/kriya')).body.remaining, 48);
+
+    // Dashboard: tercatat Lunas Rp0 dengan metode "Gratis", tidak masuk antrean verifikasi.
+    const [orderId] = res.body.orderIds;
+    const paid = (await adminCall('/orders?type=Tiket&payment=Lunas')).body;
+    assert.ok(paid.some((o: any) => o.id === orderId && o.amount === 0 && o.method === 'Gratis'));
+
+    // Notifikasi: "E-tiket gratis terbit", bukan "Pembayaran tiket dikonfirmasi".
+    const notes = (await call('/notifications', { token: sari })).body.items;
+    assert.ok(notes.some((n: any) => n.title === 'E-tiket gratis terbit' && n.targetId === res.body.code));
+    assert.ok(!notes.some((n: any) => n.title === 'Pembayaran tiket dikonfirmasi'));
+
+    // Tidak ada pembayaran yang perlu diunggah.
+    const pay = await call(`/tickets/${res.body.code}/payment`, { token: sari, form: proofForm() });
+    assert.equal(pay.status, 409);
+    assert.match(pay.body.error, /sudah lunas/);
+  });
+});
+
+describe('gambar acara unggahan admin', () => {
+  test('dikirim ke aplikasi sebagai URL di kolom photo (acara & e-tiket)', async () => {
+    await pool.execute('UPDATE events SET image = ? WHERE id = ?', ['1-ab-poster.png', 'wayang']);
+    const url = `${config.adminPublicUrl}/uploads/1-ab-poster.png`;
+    assert.equal((await call('/events/wayang')).body.photo, url);
+    const budi = await login('budi.santoso@email.com');
+    const lines = (await call('/tickets', { token: budi })).body.flatMap((b: any) => b.lines);
+    assert.ok(lines.some((l: any) => l.eventId === 'wayang' && l.photo === url));
+    await pool.execute('UPDATE events SET image = NULL WHERE id = ?', ['wayang']);
+    assert.equal((await call('/events/wayang')).body.photo, 'wayang', 'tanpa unggahan → kunci foto bawaan');
   });
 });

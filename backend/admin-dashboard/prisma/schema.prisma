@@ -186,6 +186,8 @@ model Event {
   sold       Int?
   price      Int?
   photo      String?     @db.VarChar(30)
+  /// Gambar unggahan admin (nama berkas di uploads/ atau URL Vercel Blob). Menggantikan `photo` bila diisi.
+  image      String?     @db.VarChar(500)
   created_at DateTime    @db.DateTime(3)
   updated_at DateTime    @db.DateTime(3)
   orders     Order[]

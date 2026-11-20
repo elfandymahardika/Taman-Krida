@@ -170,7 +170,7 @@ class AccountScreen extends StatelessWidget {
                   subtitle: 'Hubungi pengelola TKBJ',
                   onTap: () => showAppToast(
                     context,
-                    'Hubungi TKBJ: (0341) 123-456 · info@tkbj.jatimprov.go.id',
+                    'Hubungi TKBJ: (0341) 471509 · Instagram @disbudparjatimprov',
                   ),
                 ),
                 const SizedBox(height: 16),

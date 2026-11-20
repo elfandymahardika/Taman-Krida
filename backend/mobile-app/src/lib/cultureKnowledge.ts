@@ -6,7 +6,8 @@
  *   diberi tombol "Baca materi". Bila materi di aplikasi diubah, ubah juga di sini.
  * - Entri lain adalah ringkasan umum kesenian Jawa Timur. Isinya sengaja ringkas dan hanya memuat fakta yang
  *   umum dikenal; tambahkan/perbaiki bersama pengelola TKBJ bila ada sumber resmi.
- * - Sejarah pendirian kompleks TKBJ belum dicantumkan karena tanggal resminya belum terverifikasi. Isi
+ * - Fakta TKBJ di entri 'tkbj' bersumber dari Wikipedia, berita TIMES Indonesia/Radar Malang/ANTARA (2026). Tanggal
+ *   pendirian kompleks belum dicantumkan karena belum terverifikasi. Isi
  *   `sejarah` pada entri 'tkbj' bila sudah ada sumber resmi (mis. dari Dinas Kebudayaan Jatim).
  */
 
@@ -32,16 +33,26 @@ export const CULTURE_ENTRIES: CultureEntry[] = [
     kategori: 'Tentang TKBJ',
     kataKunci: ['tkbj', 'taman krida', 'krida budaya'],
     ringkasan:
-      'Pusat kegiatan seni dan budaya Jawa Timur di Kota Malang yang menyediakan ruang pertunjukan, pameran, dan ' +
-      'latihan bagi komunitas seni.',
+      'Kompleks seni budaya di Jl. Soekarno Hatta No. 7, Jatimulyo, Lowokwaru, Kota Malang, dikelola UPT LPPK Taman ' +
+      'Krida Budaya di bawah Disbudpar Provinsi Jawa Timur. Masuk gratis.',
     sejarah:
-      'TKBJ adalah aset Pemerintah Provinsi Jawa Timur yang dipakai sebagai tempat pentas, pameran, dan latihan ' +
-      'kesenian. Pendopo Agung TKBJ dibangun dengan konsep joglo (ruang terbuka beratap tinggi), sehingga ' +
-      'pertunjukan dapat disaksikan dari berbagai sisi. Detail tanggal pendirian belum tersedia di data aplikasi.',
+      'TKBJ berdiri di atas lahan 17.050 m² dengan luas bangunan 4.103 m². Gerbangnya bergaya candi dan pendoponya ' +
+      'beratap joglo dengan bagian luar dan dalam, sehingga pertunjukan dapat disaksikan dari berbagai sisi. Selain ' +
+      'pendopo terdapat panggung terbuka, gedung pameran, mini museum, mushola, dan area parkir. Sejak Februari 2025 ' +
+      'Disbudpar Jatim kembali menggelar pagelaran rutin Topeng Panji/Topeng Malangan di TKBJ secara gratis. ' +
+      'Tanggal pendirian kompleks belum tersedia di data aplikasi.',
+    linimasa: [
+      '21 Februari 2026: Tari Topeng Malangan "Love Hunt for You – Dewi Ragil Kuning" bersama sanggar-sanggar Malang Raya.',
+      '25 April 2026: Topeng Panji "Candrasmara" oleh STKW Surabaya, gratis, mulai 18.00 WIB.',
+      '30 Juni–5 Juli 2026: festival Malang Djadoel 3 (reog, bantengan, jaranan, topeng, wayang suket, bazar antik).',
+      '16 Oktober 2026: Sendratari Ramayana "Sotya Chapter: Shinta Ilang" memperingati Hari Jadi ke-81 Jawa Timur.',
+      '7 November 2026: pagelaran wayang puncak Hari Wayang Nasional, gratis.',
+    ],
     makna: [
-      'Pendopo Agung TKBJ: pertunjukan tradisi seperti wayang dan karawitan.',
-      'Panggung Terbuka: pentas luar ruang seperti tari, reog, jaranan, dan ludruk.',
-      'Gedung Kesenian & Galeri: pameran dan lokakarya (kriya, batik).',
+      'Pendopo Agung TKBJ: pertunjukan tradisi seperti wayang, karawitan, dan Topeng Panji.',
+      'Panggung Terbuka: pentas luar ruang seperti sendratari, reog, jaranan, dan bantengan.',
+      'Gedung Kesenian & Galeri: pameran batik, kriya, seni rupa, dan fotografi, serta mini museum.',
+      'Jam kantor Senin–Jumat 08.00–16.00 WIB; Sabtu–Minggu hanya dibuka saat ada acara. Telepon (0341) 471509.',
     ],
   },
   {

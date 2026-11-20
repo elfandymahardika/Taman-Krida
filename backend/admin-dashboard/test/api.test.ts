@@ -223,11 +223,55 @@ describe('acara', () => {
     assert.equal(dup.status, 400)
     assert.match(dup.body.fields.name, /sudah ada/)
 
+    assert.equal(created.body.price, 50000, 'harga kosong → harga bawaan')
+
+    // Harga 0 = tiket gratis; tidak boleh berubah menjadi harga bawaan (dulu `price || 50000`).
+    const free = await call('/events', { token, method: 'POST', body: { ...body, name: 'Uji Tiket Gratis', quota: '40', price: '0' } })
+    assert.equal(free.status, 201)
+    assert.equal(free.body.price, 0)
+    const edited = await call(`/events/${free.body.id}`, { token, method: 'PUT', body: { ...body, name: 'Uji Tiket Gratis', quota: '40', price: '' } })
+    assert.equal(edited.body.price, 0, 'harga kosong saat edit → harga lama dipertahankan')
+    assert.equal((await call(`/events/${free.body.id}`, { token, method: 'DELETE' })).status, 204)
+
     const published = await call(`/events/${created.body.id}`, { token, method: 'PATCH', body: { status: 'Terpublikasi' } })
     assert.equal(published.body.status, 'Terpublikasi')
 
     assert.equal((await call(`/events/${created.body.id}`, { token, method: 'DELETE' })).status, 204)
     assert.equal((await call(`/events/${created.body.id}`, { token })).status, 404)
+  })
+
+  test('gambar acara: unggah, ganti, validasi, hapus, ikut terhapus bersama acaranya', async () => {
+    const token = await login('admin', 'admin123')
+    const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex')
+    const JPG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46, 0x49, 0x46])
+    const body = { name: 'Uji Gambar Acara', organizer: 'Tim Uji', date: '2026-10-20', start: '19:00', end: '21:00', venue: 'Pendopo Agung TKBJ' }
+    const id = (await call('/events', { token, method: 'POST', body })).body.id
+    const files = () => fs.readdirSync(uploadsDir)
+
+    const pdf = await call(`/events/${id}/image`, { token, method: 'POST', raw: Buffer.from('%PDF-1.4'), type: 'application/pdf' })
+    assert.equal(pdf.status, 415)
+    const fake = await call(`/events/${id}/image`, { token, method: 'POST', raw: Buffer.from('bukan gambar'), type: 'image/png' })
+    assert.equal(fake.status, 400, 'isi berkas dicek, bukan hanya Content-Type')
+    assert.equal((await call(`/events/${id}/image`, { token: await login('keuangan', 'keuangan123'), method: 'POST', raw: PNG, type: 'image/png' })).status, 403)
+
+    const up = await call(`/events/${id}/image?name=poster.png`, { token, method: 'POST', raw: PNG, type: 'image/png' })
+    assert.equal(up.status, 200)
+    assert.match(up.body.imageUrl, /^\/uploads\/.+poster\.png$/)
+    assert.equal(files().length, 1)
+
+    // Ganti gambar: berkas lama dihapus.
+    const replaced = await call(`/events/${id}/image?name=poster-baru.jpg`, { token, method: 'POST', raw: JPG, type: 'image/jpeg' })
+    assert.match(replaced.body.imageUrl, /poster-baru\.jpg$/)
+    assert.deepEqual(files(), [replaced.body.imageUrl.split('/').pop()])
+    assert.equal((await call(`/events/${id}`, { token })).body.imageUrl, replaced.body.imageUrl)
+
+    const removed = await call(`/events/${id}/image`, { token, method: 'DELETE' })
+    assert.equal(removed.body.imageUrl, undefined)
+    assert.equal(files().length, 0)
+
+    await call(`/events/${id}/image?name=poster.png`, { token, method: 'POST', raw: PNG, type: 'image/png' })
+    assert.equal((await call(`/events/${id}`, { token, method: 'DELETE' })).status, 204)
+    assert.equal(files().length, 0, 'gambar ikut terhapus bersama acaranya')
   })
 
   test('kuota tidak boleh di bawah tiket terjual; acara berpesanan tidak bisa dihapus', async () => {
@@ -435,7 +479,7 @@ describe('dashboard', () => {
     const token = await login('admin', 'admin123')
     const oct = await call('/dashboard/summary?period=2026-10', { token })
     assert.equal(oct.status, 200)
-    assert.equal(oct.body.metrics.events.total, 12)
+    assert.equal(oct.body.metrics.events.total, 11) // 10 acara contoh + Sendratari Ramayana (asli, 16/10)
     assert.equal(oct.body.previous.key, '2026-09')
     assert.equal(oct.body.previousMetrics.events.total, 4)
     assert.equal((await call('/dashboard/summary?period=abc', { token })).status, 400)
@@ -629,7 +673,7 @@ describe('CHECK POINT 11: middleware auth, peran, dan pembatas', () => {
 
   test('Prisma: skema & migration sudah diterapkan di database test', async () => {
     const migrations = await prisma.$queryRaw<{ migration_name: string }[]>`SELECT migration_name FROM _prisma_migrations ORDER BY migration_name`
-    assert.deepEqual(migrations.map((m) => m.migration_name), ['0_init', '1_blob_file_urls'])
+    assert.deepEqual(migrations.map((m) => m.migration_name), ['0_init', '1_blob_file_urls', '2_event_image'])
     assert.equal(await prisma.user.count(), (await call('/users', { token: await login('admin', 'admin123') })).body.length)
   })
 })

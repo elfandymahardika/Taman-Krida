@@ -2,6 +2,7 @@ import pool, { Queryable, transaction } from '../config/db';
 import { RowDataPacket } from 'mysql2';
 import { EVENTS } from '../db/seeders/data';
 import { hhmm, iso } from '../lib/format';
+import { publicUrl } from '../services/storage.service';
 import { SqlValue } from '../lib/http';
 
 export type EventStatus = 'Terpublikasi' | 'Draf';
@@ -20,6 +21,8 @@ export interface Event {
   sold: number | null;
   price: number | null;
   photo: string | null;
+  /** Gambar unggahan admin (nama berkas lokal atau URL Vercel Blob). */
+  image: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +61,8 @@ export const toEvent = (r: Event) => ({
   sold: r.sold ?? undefined,
   price: r.price ?? undefined,
   photo: r.photo ?? undefined,
+  /** URL gambar unggahan (relatif /uploads/... atau URL blob publik); diutamakan daripada `photo`. */
+  imageUrl: r.image ? publicUrl(r.image) : undefined,
   updatedAt: iso(r.updated_at),
 });
 
@@ -89,7 +94,7 @@ export const upsertEvent = async (e: EventInput, now = new Date(), db: Queryable
      ON DUPLICATE KEY UPDATE
        name = VALUES(name), short = VALUES(short), organizer = VALUES(organizer), date = VALUES(date),
        start_time = VALUES(start_time), end_time = VALUES(end_time), venue = VALUES(venue), status = VALUES(status),
-       quota = VALUES(quota), sold = VALUES(sold), price = VALUES(price), photo = VALUES(photo), updated_at = VALUES(updated_at)`,
+       quota = VALUES(quota), sold = VALUES(sold), price = VALUES(price), photo = VALUES(photo), image = NULL, updated_at = VALUES(updated_at)`,
     [
       e.id,
       e.name,
@@ -143,6 +148,17 @@ export const addTicketsSold = async (id: string, qty: number, db: Queryable = po
 
 export const deleteEvent = async (id: string) => {
   await pool.execute('DELETE FROM events WHERE id = ?', [id]);
+};
+
+/** Simpan/hapus kunci gambar acara (null = hapus). */
+export const setEventImage = async (id: string, image: string | null) => {
+  await pool.execute('UPDATE events SET image = ?, updated_at = ? WHERE id = ?', [image, new Date(), id]);
+};
+
+/** Kunci gambar yang akan hilang saat data contoh dipulihkan (acara non-contoh + gambar acara contoh). */
+export const sampleResetImages = async () => {
+  const [rows] = await pool.execute<RowDataPacket[]>('SELECT image FROM events WHERE image IS NOT NULL');
+  return rows.map((r) => String(r.image));
 };
 
 /** Kembalikan tabel acara ke data contoh. */

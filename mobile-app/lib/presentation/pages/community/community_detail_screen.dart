@@ -80,7 +80,10 @@ class CommunityDetailScreen extends StatelessWidget {
                     label: 'Berdiri',
                   ),
                   const SizedBox(width: 8),
-                  _Stat(value: '${community.members}', label: 'Anggota'),
+                  _Stat(
+                    value: community.members > 0 ? '${community.members}' : '–',
+                    label: 'Anggota',
+                  ),
                   const SizedBox(width: 8),
                   _Stat(value: community.performances, label: 'Pentas'),
                 ],
@@ -108,7 +111,7 @@ class CommunityDetailScreen extends StatelessWidget {
                 title: 'Kontak',
                 children: [
                   InfoRow(label: 'Ketua', value: community.leader),
-                  InfoRow(label: 'WhatsApp', value: community.phone),
+                  InfoRow(label: 'Kontak', value: community.phone),
                   InfoRow(label: 'Alamat', value: community.address),
                 ],
               ),

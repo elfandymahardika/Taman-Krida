@@ -209,7 +209,8 @@ export const validateProfile = validate((body) => {
   if (!p.manager) errors.manager = 'Pengelola wajib diisi.';
   if (p.address.length < 10) errors.address = 'Alamat minimal 10 karakter.';
   if (!PHONE_RE.test(p.phone)) errors.phone = 'Nomor telepon tidak valid.';
-  if (!PHONE_RE.test(p.whatsapp)) errors.whatsapp = 'Nomor WhatsApp tidak valid.';
+  // WhatsApp layanan opsional: TKBJ belum mempublikasikan nomor WA resmi.
+  if (p.whatsapp && !PHONE_RE.test(p.whatsapp)) errors.whatsapp = 'Nomor WhatsApp tidak valid.';
   if (!p.hours) errors.hours = 'Jam layanan wajib diisi.';
   if (p.about.length < 20) errors.about = 'Deskripsi minimal 20 karakter.';
   else if (p.about.length > 500) errors.about = 'Deskripsi maksimal 500 karakter.';

@@ -44,7 +44,8 @@ export default function EditorProfil({ profil: { form, errors, set, dirty, busy,
         <div>
           <DetailRow label="Jam layanan">{form.hours}</DetailRow>
           <DetailRow label="Kontak">
-            {form.phone} · WA {form.whatsapp}
+            {form.phone}
+            {form.whatsapp ? ` · WA ${form.whatsapp}` : ''}
           </DetailRow>
         </div>
         <p style={{ fontSize: 12, lineHeight: 1.5 }}>{form.address}</p>

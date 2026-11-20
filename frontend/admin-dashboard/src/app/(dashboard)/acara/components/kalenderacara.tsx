@@ -3,8 +3,7 @@
 import { Plus } from 'lucide-react'
 import { Badge, Card, DetailRow, Photo } from '@/components/ui'
 import { useOverlay } from '@/components/overlay'
-import { PHOTOS } from '@/data/sample'
-import { formatTime, timeRange } from '@/data/events'
+import { eventPhoto, formatTime, timeRange } from '@/data/events'
 import type { Event } from '@/data/events'
 import { eventDetail } from '@/data/eventforms'
 import { longDate, monthGrid, monthLabel } from '@/data/format'
@@ -121,7 +120,7 @@ function AgendaTerpilih({ event, date }: { event?: Event; date: string }) {
     <Card title="Agenda terpilih" subtitle={longDate(date)}>
       {event ? (
         <>
-          {event.photo && <Photo {...PHOTOS[event.photo]} width="100%" height={148} />}
+          {eventPhoto(event) && <Photo {...eventPhoto(event)} width="100%" height={148} />}
           <div>
             <Badge>{event.status}</Badge>
           </div>

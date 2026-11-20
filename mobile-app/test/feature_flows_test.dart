@@ -114,6 +114,74 @@ void main() {
     expect(state.notification.unreadCount, unreadBefore + 3);
   });
 
+  test('tiket gratis langsung lunas; gratis & berbayar dipesan terpisah', () async {
+    final state = await signedInState();
+    final events = state.catalog.events;
+    final free = events.firstWhere((e) => e.id == 'pameran-batik-kriya');
+    final walkIn = events.firstWhere((e) => e.id == 'malang-djadoel-3');
+    expect(free.isFreeTicket, isTrue, reason: 'kuota diisi + harga 0');
+    expect(walkIn.isTicketed, isFalse, reason: 'kuota kosong = datang langsung');
+    expect(state.catalog.ticketedEvents.map((e) => e.id), contains(free.id));
+    expect(
+      state.catalog.ticketedEvents.map((e) => e.id),
+      isNot(contains(walkIn.id)),
+    );
+
+    state.ticket
+      ..saveBuyer(
+        const BuyerInfo(
+          name: 'Budi Santoso',
+          email: 'budi.santoso@email.com',
+          phone: '081234567890',
+        ),
+      )
+      ..setQuantity(free.id, 2)
+      ..setQuantity('wayang-bima-bungkus', 1);
+    expect(state.ticket.isCartMixed, isTrue);
+    await expectLater(state.ticket.placeOrder(), throwsA(anything));
+
+    state.ticket.setQuantity('wayang-bima-bungkus', 0);
+    expect(state.ticket.isCartFree, isTrue);
+    final order = await state.ticket.placeOrder();
+    expect(order.status, PaymentStatus.paid);
+    expect(order.total, 0);
+    expect(order.lines.single.ticketCodes, hasLength(2));
+  });
+
+  testWidgets('alur ambil tiket gratis tanpa layar pembayaran', (tester) async {
+    final state = await signedInState();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(TkbjApp(container: state));
+    await tester.pumpAndSettle();
+    final navigator = tester.state<NavigatorState>(
+      find.byType(Navigator).first,
+    );
+
+    // Pola 2: datang langsung → tidak ada tombol pesan.
+    navigator.pushNamed(AppRoutes.eventDetail, arguments: 'malang-djadoel-3');
+    await tester.pumpAndSettle();
+    expect(find.text('Gratis · datang langsung'), findsOneWidget);
+    expect(find.text('Lihat Denah Lokasi'), findsOneWidget);
+    navigator.pop();
+    await tester.pumpAndSettle();
+
+    // Pola 1: tiket gratis → detail → keranjang → data pemesan → e-tiket.
+    navigator.pushNamed(
+      AppRoutes.eventDetail,
+      arguments: 'pameran-batik-kriya',
+    );
+    await tester.pumpAndSettle();
+    await _tapText(tester, 'Ambil Tiket Gratis');
+    await _tapText(tester, 'Ya, Ambil Tiket');
+    await _tapText(tester, 'Ambil Tiket Gratis');
+    expect(find.text('Lanjutkan Pembayaran →'), findsNothing);
+    await _tapText(tester, 'Ambil Tiket Gratis →');
+    expect(find.text('Tiket Gratis Aktif!'), findsOneWidget);
+    expect(state.ticket.orders.first.status, PaymentStatus.paid);
+  });
+
   test('pengajuan ditolak menyimpan catatan admin', () async {
     final state = await signedInState();
     await state.admin.rejectRental('SG-1026-0020');

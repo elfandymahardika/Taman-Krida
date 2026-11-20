@@ -553,7 +553,9 @@ export function Photo({
         <video className="photo__video" src={url} muted playsInline preload="metadata" aria-label={alt} />
       ) : url ? (
         // Foto unggahan (/uploads/...) dioptimasi Next.js (lihat images.localPatterns di next.config.mjs).
-        <Image src={url} alt={alt} fill sizes={sizes} />
+        // URL Vercel Blob publik (https://...) ditampilkan apa adanya (`unoptimized`), karena host-nya tidak
+        // didaftarkan di images.remotePatterns.
+        <Image src={url} alt={alt} fill sizes={sizes} unoptimized={/^https?:\/\//.test(url)} />
       ) : (
         <Image src={src} alt={alt} sizes={sizes} />
       )}

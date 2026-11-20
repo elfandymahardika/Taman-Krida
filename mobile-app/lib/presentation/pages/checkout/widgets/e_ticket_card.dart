@@ -27,6 +27,7 @@ class ETicketCard extends StatelessWidget {
       ],
       codeLabel: 'Kode Booking E-Tiket Anda',
       code: order.bookingCode,
+      badge: order.total == 0 ? 'TIKET GRATIS' : 'LUNAS / PAID',
     );
   }
 }

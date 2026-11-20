@@ -80,11 +80,14 @@ class ProfileMapScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Taman Krida Budaya Jawa Timur didirikan sebagai episentrum '
-                'kebudayaan luhur masyarakat Jatim. Di bawah naungan '
-                'Disbudpar Jatim, TKBJ berfungsi merawat eksistensi seni musik '
-                '& tari tradisional khas pesisiran dan agraris agar terus '
-                'dinikmati generasi mendatang.',
+                'Taman Krida Budaya Jawa Timur berdiri di Jl. Soekarno Hatta '
+                'No. 7, Jatimulyo, Lowokwaru, Kota Malang, di atas lahan '
+                '17.050 m² dengan bangunan 4.103 m². Dikelola UPT LPPK Taman '
+                'Krida Budaya di bawah Disbudpar Jatim, kompleks bergerbang '
+                'candi ini menjadi tempat pentas wayang, ketoprak, sendratari, '
+                'reog, jaranan, bantengan, dan pameran seni. Sejak Februari '
+                '2025, Disbudpar Jatim menggelar pagelaran rutin Topeng Panji '
+                'di sini secara gratis.',
                 style: AppText.poppins(
                   13,
                   color: AppColors.muted,

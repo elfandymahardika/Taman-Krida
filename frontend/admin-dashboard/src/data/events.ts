@@ -1,5 +1,6 @@
-import { mutate, useQuery } from '../lib/api'
+import { assetUrl, mutate, upload, useQuery } from '../lib/api'
 import type { FieldErrors } from '../lib/api'
+import { PHOTOS } from './sample'
 import type { PhotoKey } from './sample'
 
 /*
@@ -30,10 +31,31 @@ export type Event = {
   price?: number | null
   /** Kunci foto di `PHOTOS` (data/sample). */
   photo?: PhotoKey | null
+  /** Gambar unggahan admin (/uploads/... atau URL blob). Diutamakan daripada `photo`. */
+  imageUrl?: string
+}
+
+/** Gambar acara yang boleh diunggah (dicek ulang di backend, termasuk isi berkasnya). */
+export const EVENT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+export const EVENT_IMAGE_MAX_MB = 5
+
+/** Props <Photo/> untuk acara: gambar unggahan, lalu foto bawaan; null bila acara belum punya gambar. */
+export const eventPhoto = (e: Pick<Event, 'name' | 'photo' | 'imageUrl'>) =>
+  e.imageUrl ? { url: assetUrl(e.imageUrl), alt: e.name } : e.photo ? { ...PHOTOS[e.photo], alt: e.name } : null
+
+/** Kolom berkas gambar di formulir (File kosong bila tidak dipilih). */
+export const pickedImage = (value: unknown) => (value instanceof File && value.size > 0 ? value : null)
+
+export function validateEventImage(value: unknown) {
+  const file = pickedImage(value)
+  if (!file) return undefined
+  if (!EVENT_IMAGE_TYPES.includes(file.type)) return 'Gambar harus berformat JPG, PNG, atau WEBP.'
+  if (file.size > EVENT_IMAGE_MAX_MB * 1024 * 1024) return `Ukuran gambar maksimal ${EVENT_IMAGE_MAX_MB} MB.`
+  return undefined
 }
 
 /** Isian formulir acara (semua berupa teks dari FormData). */
-export type EventInput = Partial<Record<'name' | 'organizer' | 'date' | 'start' | 'end' | 'venue' | 'status' | 'quota', string>>
+export type EventInput = Partial<Record<'name' | 'organizer' | 'date' | 'start' | 'end' | 'venue' | 'status' | 'quota' | 'price', string>>
 
 /* ---------- Format tampilan ---------- */
 
@@ -70,6 +92,10 @@ export function validateEvent(data: EventInput, list: Event[], editingId?: strin
     const q = Number(data.quota)
     if (!Number.isInteger(q) || q < 0) errors.quota = 'Kuota harus bilangan bulat ≥ 0.'
   }
+  if (data.price !== '' && data.price !== undefined) {
+    const p = Number(data.price)
+    if (!Number.isInteger(p) || p < 0) errors.price = 'Harga harus bilangan bulat ≥ 0.'
+  }
   return errors
 }
 
@@ -82,6 +108,9 @@ export const eventStore = {
   /** Ubah sebagian: { status }, { quota, price }. */
   patch: (id: string, data: Partial<Pick<Event, 'status' | 'quota' | 'price'>>) => mutate(`/events/${id}`, { method: 'PATCH', body: data }),
   remove: (id: string) => mutate(`/events/${id}`, { method: 'DELETE' }),
+  /** Unggah/ganti gambar acara (berkas mentah, maks. 5 MB). */
+  uploadImage: (id: string, file: File) => upload<Event>(`/events/${id}/image?name=${encodeURIComponent(file.name)}`, file).promise,
+  removeImage: (id: string) => mutate(`/events/${id}/image`, { method: 'DELETE' }),
   setStatus: (id: string, status: EventStatus) => eventStore.patch(id, { status }),
   reset: () => mutate('/events/reset', { method: 'POST' }),
 }
