@@ -26,14 +26,14 @@ Untuk presentasi tanpa server ada **mode demo** yang memakai data contoh di memo
 
 | Ketentuan | Implementasi |
 |---|---|
-| Halaman login (simulasi) | `LoginScreen`: validasi email & kata sandi, pesan "email belum terdaftar" / "kata sandi salah", tombol isi akun demo, sheet **Lupa Kata Sandi**. Halaman **Daftar Akun** juga tersedia. |
+| Halaman login (simulasi) | `LoginScreen`: validasi email & kata sandi, pesan "email belum terdaftar" / "kata sandi salah", sheet **Lupa Kata Sandi**. Halaman **Daftar Akun** juga tersedia. |
 | Halaman utama | `HomeScreen`: hero, tentang TKBJ, 7 kartu fitur utama yang semuanya bisa dibuka. |
 | Form input | Login, Daftar Akun, Lupa Kata Sandi, **Data Pemesan** (checkout), **Formulir Kegiatan** & **Unggah Berkas** (sewa gedung), **Daftarkan Komunitas**, Edit Profil. |
 | Halaman yang menampilkan data / hasil input | Kalender & detail acara, galeri, komunitas, materi edukasi, **E-Tiket**, **Tiket Saya**, **Status Pengajuan**, **Bukti Reservasi**, **Riwayat Sewa**, **Notifikasi**, Akun Saya. Data yang diisi di form langsung muncul di halaman ini. |
-| Navigasi antarhalaman | 32 rute bernama (`lib/routes/app_routes.dart`), menu navigasi layar penuh, breadcrumb, rute akun yang dilindungi login (otomatis diarahkan ke halaman Masuk). |
+| Navigasi antarhalaman | *Bottom navigation* 5 tab (Beranda, Acara, Tiket, Jelajah, Akun) dengan badge keranjang & notifikasi, app bar dengan tombol kembali, 32 rute bernama (`lib/presentation/routes/app_routes.dart`), rute akun yang dilindungi login (otomatis diarahkan ke halaman Masuk). |
 | Validasi sederhana | Wajib isi, format email, nomor WhatsApp `08…` 10–13 digit, kata sandi ≥ 8 karakter dengan huruf besar, huruf kecil & angka (sama dengan server), persetujuan ketentuan, keranjang tidak boleh kosong, jumlah tiket 0–4, **tanggal/slot venue penuh**, **3 berkas sewa wajib diunggah**, kategori komunitas wajib dipilih, deskripsi ≥ 20 karakter. |
-| Data dummy | `lib/data/dummy/` (acara, fasilitas, galeri, komunitas, materi edukasi, akun, pesanan, pengajuan sewa, notifikasi). |
-| Rancangan AI | Lihat [Rancangan Fitur AI](#rancangan-fitur-ai). |
+| Data dummy | `lib/data/datasources/demo/seed/` (acara, fasilitas, galeri, komunitas, akun, pesanan, pengajuan sewa, notifikasi) dan `lib/data/datasources/local/culture_data.dart` (materi edukasi). |
+| Fitur AI | **Tanya Krida**: asisten AI (Google Gemini) yang menjelaskan TKBJ & sejarah kesenian Jawa Timur serta menjawab jadwal, tiket, sewa gedung, dan komunitas dari data server. Lihat [Fitur AI: Tanya Krida](#fitur-ai-tanya-krida). |
 
 ### Akun demo
 
@@ -41,7 +41,7 @@ Untuk presentasi tanpa server ada **mode demo** yang memakai data contoh di memo
 |---|---|
 | `budi.santoso@email.com` | `tkbj2026` |
 
-Tekan **Pakai** pada kotak akun demo di halaman Masuk untuk mengisi form otomatis. Akun baru dari halaman Daftar juga bisa dipakai selama aplikasi berjalan.
+Akun baru dari halaman Daftar juga bisa dipakai selama aplikasi berjalan.
 
 ---
 
@@ -90,7 +90,7 @@ flutter build web             # hasil: build/web/
 
 ```bash
 flutter analyze   # analisis statis (lint)
-flutter test      # 152 test: unit, alur fitur, dan responsif (memakai mode demo, tanpa server)
+flutter test      # 164 test: unit, alur fitur, dan responsif (memakai mode demo, tanpa server)
 ```
 
 **Uji terhadap server sungguhan** (`test/live_api_test.dart`, dilewati bila alamat tidak diisi). Test ini memakai API dashboard untuk keputusan admin, sehingga mencakup:
@@ -108,8 +108,8 @@ $env:TKBJ_API_URL='http://localhost:5001/api'; $env:TKBJ_ADMIN_URL='http://local
 flutter test test/live_api_test.dart
 ```
 
-- `test/widget_test.dart` dan `test/feature_flows_test.dart` menguji alur login, checkout tiket, sewa gedung (ajukan → disetujui/ditolak → bayar), validasi unggah berkas, daftar komunitas, filter galeri, dan notifikasi.
-- `test/responsive_test.dart` merender **34 layar** pada 4 ukuran (320×568, 430×932, landscape 844×390, tablet 1024×768) dan gagal jika ada *overflow*.
+- `test/widget_test.dart` dan `test/feature_flows_test.dart` menguji alur login, checkout tiket, sewa gedung (ajukan → disetujui/ditolak → bayar), validasi unggah berkas, daftar komunitas, filter galeri, notifikasi, dan Tanya Krida (jawab → tombol membuka layar, gagal → coba lagi).
+- `test/responsive_test.dart` merender **36 layar** pada 4 ukuran (320×568, 430×932, landscape 844×390, tablet 1024×768) dan gagal jika ada *overflow*.
 
 Screenshot di bawah dibuat otomatis dengan:
 
@@ -147,7 +147,7 @@ State management memakai `ChangeNotifier` + `InheritedNotifier` bawaan Flutter (
 
 **Beranda, akun, profil & acara**
 
-| Beranda | Menu navigasi | Masuk | Daftar akun |
+| Beranda | Jelajah | Masuk | Daftar akun |
 |---|---|---|---|
 | <img src="docs/screenshots/01-beranda.png" width="200"> | <img src="docs/screenshots/02-menu-navigasi.png" width="200"> | <img src="docs/screenshots/03-masuk.png" width="200"> | <img src="docs/screenshots/04-daftar-akun.png" width="200"> |
 
@@ -189,9 +189,11 @@ State management memakai `ChangeNotifier` + `InheritedNotifier` bawaan Flutter (
 |---|---|---|---|
 | <img src="docs/screenshots/29-edukasi-foto-video.png" width="200"> | <img src="docs/screenshots/30-akun-saya.png" width="200"> | <img src="docs/screenshots/31-tiket-saya.png" width="200"> | <img src="docs/screenshots/32-riwayat-sewa.png" width="200"> |
 
-| Edit profil | Notifikasi |
-|---|---|
-| <img src="docs/screenshots/33-edit-profil.png" width="200"> | <img src="docs/screenshots/34-notifikasi.png" width="200"> |
+| Edit profil | Notifikasi | Tanya Krida (AI) | Jawaban Tanya Krida |
+|---|---|---|---|
+| <img src="docs/screenshots/33-edit-profil.png" width="200"> | <img src="docs/screenshots/34-notifikasi.png" width="200"> | <img src="docs/screenshots/35-tanya-krida.png" width="200"> | <img src="docs/screenshots/36-tanya-krida-jawaban.png" width="200"> |
+
+Screenshot jawaban diambil dari mode demo (jawaban contoh). Dengan server dan `GEMINI_API_KEY`, jawabannya disusun AI dari data database dan materi budaya.
 
 ---
 
@@ -218,7 +220,7 @@ Pemesanan tiket, pengajuan sewa, pendaftaran komunitas, dan setiap keputusan adm
 
 ## Responsif
 
-- Navbar tetap di atas; isi dan footer berada di dalam `SingleChildScrollView`, jadi tidak ada *bottom overflow* di ponsel kecil atau saat landscape.
+- App bar menempel di atas (judul besar ikut tergulir lalu pindah ke app bar), isi berada di dalam `CustomScrollView` dengan tarik-untuk-segarkan, dan aksi utama (total + tombol lanjut) menempel di bawah layar, jadi tidak ada *bottom overflow* di ponsel kecil atau saat landscape.
 - `ContentSection` membatasi lebar konten maksimal 720 px dan menaruhnya di tengah pada tablet/landscape, sementara latar section tetap selebar layar.
 - `ResponsiveGrid` (berbasis `LayoutBuilder`) menyusun kartu 1 kolom di ponsel dan 2–4 kolom di layar lebar. Grid galeri: 2 kolom di ponsel.
 - Kalender ketersediaan dan stepper sewa memakai kolom `Expanded` selebar sama; label stepper mengecil (`FittedBox`) di layar sempit.
@@ -227,11 +229,46 @@ Pemesanan tiket, pengajuan sewa, pendaftaran komunitas, dan setiap keputusan adm
 
 ---
 
-## Rancangan Fitur AI
+## Fitur AI: Tanya Krida
 
-> Fitur ini **belum diimplementasikan**. Ini rencana pengembangan tahap berikutnya dan merupakan fitur AI yang sama dengan yang dijelaskan di [README Dashboard Web](../admin-dashboard/README.md#rancangan-fitur-ai).
+**Tanya Krida** adalah asisten AI di aplikasi. Pengunjung bertanya dengan bahasa sehari-hari, lalu asisten menjawab dari **data asli di server** (database yang sama dengan Dashboard Web) dan dari **materi budaya** yang juga dipakai halaman Edukasi Budaya.
 
-### Asisten Verifikasi Bukti Pembayaran (sisi aplikasi mobile)
+Contoh pertanyaan:
+
+- *"Apa itu Taman Krida Budaya Jawa Timur?"*
+- *"Ceritakan sejarah Tari Remo"*, *"Apa makna warna Topeng Malangan?"*, *"Apa bedanya ludruk dan ketoprak?"*
+- *"Ada pertunjukan wayang minggu depan? Masih ada tiketnya?"*
+- *"Pendopo Agung kosong tanggal 20 Oktober malam?"*
+- *"Berapa tarif sewa Panggung Terbuka, berkas apa saja yang wajib?"*
+
+**Cara membuka:** kartu **Tanya Krida** di Beranda, atau menu **Jelajah → Tanya Krida (Asisten AI)**. Tidak perlu login.
+
+**Cara kerja**
+
+1. Aplikasi mengirim percakapan ke `POST /api/assistant/chat` di [`backend/mobile-app`](../backend/mobile-app/README.md#tanya-krida-asisten-ai).
+2. Backend memanggil model AI **Google Gemini** (`gemini-3.5-flash-lite`, kuota gratis Google AI Studio) beserta 6 alat (*tools*) baca-saja: cari acara, info fasilitas, cek jadwal sewa, cari komunitas, info layanan, dan **materi budaya** (tentang TKBJ serta sejarah dan makna Tari Remo, Topeng Malangan, Gandrung, Beskalan, Jaranan & Reog, Ludruk, Ketoprak, Wayang Kulit, Gamelan, dan Arsitektur Joglo).
+3. Model memilih alat yang dibutuhkan. Backend menjalankan query ke MySQL atau membaca materi budaya, lalu mengirim hasilnya ke model, dan model menyusun jawaban. Jadi jadwal, harga, sisa kursi, ketersediaan, dan isi sejarah **tidak dikarang**.
+4. Jawaban tampil sebagai gelembung chat dengan **tombol pintasan** ke layar terkait (Detail Acara, *Baca materi* Edukasi Budaya, Sewa venue, Profil Komunitas, Kalender, dan lainnya), ditambah **saran pertanyaan lanjutan**.
+
+| Input (dari aplikasi) | Output (ke pengguna) |
+|---|---|
+| Pertanyaan + riwayat percakapan (maks. 12 pesan) | Jawaban singkat dalam bahasa pengguna |
+| Data acara, fasilitas, jadwal, komunitas, aturan layanan, dan materi budaya (lewat alat) | 0–3 tombol ke layar aplikasi + 0–3 saran pertanyaan |
+
+**Implementasi di aplikasi:** [`lib/presentation/pages/assistant/`](lib/presentation/pages/assistant) (layar chat, gelembung, kolom ketik), `AssistantController.ask` / `retry` / `clear`, `AskAssistantUseCase`, dan `AssistantRepository`. `AssistantRemoteDataSourceImpl` memanggil server dengan batas tunggu 90 detik. `DemoDataSource` memberi jawaban contoh berbasis kata kunci (termasuk sejarah kesenian dari materi Edukasi Budaya), sehingga layar ini tetap bisa didemokan dan diuji tanpa server maupun kunci API.
+
+**Etika, keamanan & kuota**
+
+- Kunci API hanya disimpan di server (`.env` backend), tidak pernah ada di aplikasi.
+- Alat AI hanya membaca data publik. AI tidak bisa melihat data akun, memesan tiket, atau mengubah database. Pemesanan tetap lewat layar aplikasi.
+- Ada catatan *"Jawaban dibuat AI dari data TKBJ. Periksa kembali info penting"*. Pertanyaan di luar topik TKBJ/budaya ditolak dengan sopan, dan AI diminta tidak mengarang tahun atau nama tokoh yang tidak ada di materi.
+- Tombol dari AI dicek ulang server, jadi tidak bisa mengarah ke acara atau materi yang tidak ada.
+- Pertanyaan dibatasi 500 karakter dan 20 pertanyaan per 15 menit per perangkat (bisa diatur), untuk menjaga kuota gratis Gemini. Bila kuota harian habis, aplikasi menampilkan pesan dan tombol *Coba lagi*.
+- Di tier gratis Gemini, Google dapat memakai isi permintaan untuk meningkatkan produknya, jadi AI tidak pernah diberi data pribadi pengguna.
+
+### Rencana lanjutan: Asisten Verifikasi Bukti Pembayaran
+
+> Belum diimplementasikan. Ini rencana tahap berikutnya, sama dengan yang dijelaskan di [README Dashboard Web](../admin-dashboard/README.md#rancangan-fitur-ai).
 
 Pembayaran tiket dan sewa gedung lewat transfer bank harus dicocokkan admin secara manual dengan tagihan. Dengan AI, prosesnya menjadi:
 
@@ -252,6 +289,42 @@ Pembayaran tiket dan sewa gedung lewat transfer bank harus dicocokkan admin seca
 
 ---
 
+## Arsitektur: Clean Architecture
+
+Kode dibagi menjadi tiga layer. Ketergantungan hanya boleh mengarah ke dalam, yaitu ke **domain**, dan domain tidak bergantung pada apa pun (Dart murni, tanpa Flutter dan tanpa HTTP).
+
+```
+ presentation ──▶ domain ◀── data
+ (Page, Controller)  (Entity, UseCase,     (Model, DataSource,
+                      kontrak Repository)    RepositoryImpl)
+```
+
+Alur satu aksi, misalnya **Kirim Pengajuan Sewa**:
+
+```
+Page (RentalDocumentsScreen)
+  └─▶ Controller (RentalController.submit)
+        └─▶ UseCase (SubmitRentalUseCase: validasi venue/tanggal/slot)
+              └─▶ Repository (kontrak RentalRepository ← RentalRepositoryImpl)
+                    └─▶ DataSource (RentalRemoteDataSourceImpl → POST /api/rentals,
+                                    atau DemoDataSource pada mode demo)
+                          └─▶ Model (RentalRequestModel.fromJson → entity RentalRequest)
+```
+
+| Layer | Bagian | Lokasi | Tugas |
+| --- | --- | --- | --- |
+| Presentation | **Page** | `lib/presentation/pages/` | Layar & widget. Menampilkan state dari Controller dan meneruskan aksi pengguna. |
+| Presentation | **Controller** | `lib/presentation/controllers/` | Menerima aksi dari Page, memanggil use case, dan menyimpan state layar (`ChangeNotifier`) per fitur: Catalog, Auth, Ticket, Rental, Community, Notification, Assistant, Education, Upload, AdminSimulation. |
+| Domain | **Entity** | `lib/domain/entities/` | Objek bisnis Dart murni. |
+| Domain | **UseCase** | `lib/domain/usecases/` | Satu aksi bisnis per kelas, mis. `LoginUseCase`, `CheckoutUseCase`, `SubmitRentalUseCase`. |
+| Domain | **Repository (kontrak)** | `lib/domain/repositories/` | *Interface* yang dibutuhkan use case. |
+| Data | **Repository (implementasi)** | `lib/data/repositories/` | Memanggil data source dan menerjemahkan `ApiException` (HTTP) menjadi `Failure` (domain). |
+| Data | **Data Source** | `lib/data/datasources/` | `remote/` (HTTP ke backend/mobile-app), `local/` (token di SharedPreferences, pemilih berkas, materi edukasi), `demo/` (server tiruan di memori untuk test & mode demo). |
+| Data | **Model** | `lib/data/models/` | DTO turunan entity, plus `fromJson`/`toJson`. |
+| — | **Dependency injection** | `lib/injection.dart` | `AppContainer` merakit DataSource → Repository → UseCase → Controller (`.api()` / `.demo()`). |
+
+Page mengakses Controller lewat `context.watch<RentalController>()` di `build` dan `context.read<RentalController>()` di callback tombol. Keduanya disediakan `ControllerProvider` di `app.dart`.
+
 ## Struktur proyek
 
 ```
@@ -262,31 +335,39 @@ mobile-app/
 │   └── images/       foto acara & fasilitas dari Figma
 ├── lib/
 │   ├── main.dart                 entry point
-│   ├── app.dart                  MaterialApp + AppStateScope
+│   ├── app.dart                  MaterialApp + ControllerProvider
+│   ├── injection.dart            AppContainer (dependency injection)
 │   ├── core/
-│   │   ├── constants/            path aset
+│   │   ├── constants/            path aset, akun demo
+│   │   ├── error/failure.dart    Failure: error versi domain
 │   │   ├── theme/                token warna, gaya teks, ThemeData
-│   │   └── utils/                formatter rupiah/tanggal, validator, breakpoint, pemilih berkas
+│   │   └── utils/                formatter rupiah/tanggal, validator, breakpoint
+│   ├── domain/                   Dart murni, tanpa Flutter
+│   │   ├── entities/             acara, fasilitas, pesanan, pengajuan sewa, galeri,
+│   │   │                         komunitas, materi edukasi, notifikasi, akun, berkas
+│   │   ├── repositories/         kontrak (interface) repository per fitur
+│   │   └── usecases/             aksi bisnis per fitur
 │   ├── data/
-│   │   ├── api/                  ApiClient (HTTP, token, multipart, ApiException),
-│   │   │                         Visuals (foto & posisi denah untuk data server)
-│   │   ├── repository/           TkbjRepository: ApiRepository (backend/mobile-app)
-│   │   │                         & DemoRepository (data contoh, test & mode demo)
-│   │   ├── models/               acara, fasilitas, pesanan, pengajuan sewa, galeri,
-│   │   │                         komunitas, materi edukasi, notifikasi, akun
-│   │   └── dummy/                data contoh per fitur (dipakai DemoRepository)
-│   ├── state/app_state.dart      data dari repository: katalog, sesi, keranjang,
-│   │                             pesanan, sewa & ketersediaan, komunitas, notifikasi
-│   ├── routes/app_routes.dart    nama rute, router, proteksi login
-│   ├── widgets/                  komponen global yang dipakai ulang
-│   │   ├── layout/               TkbjScaffold, navbar, footer, PageHeader, ContentSection, ResponsiveGrid
-│   │   ├── common/               AppButton, AppCard, PillBadge, InfoRow, SectionCard, ReceiptCard,
-│   │   │                         ArtworkImage, VideoPreview, bottom sheet & toast
-│   │   ├── form/                 LabeledTextField, ReadOnlyField, UploadField, AppCheckbox
-│   │   └── interactive/          ChipFilter(Bar), QtyStepper, StepTracker, SegmentedTabs, UnderlineTabs
-│   └── screens/                  satu folder per fitur, widget khusus fitur di subfolder widgets/
-│       ├── home/  menu/  auth/  profile/  events/  tickets/  checkout/
-│       ├── rental/  gallery/  community/  education/  account/
+│   │   ├── models/               DTO + fromJson/toJson, Visuals (foto & posisi denah)
+│   │   ├── datasources/
+│   │   │   ├── remote/           ApiClient + RemoteDataSource per fitur (HTTP)
+│   │   │   ├── local/            token sesi, pemilih berkas, materi edukasi
+│   │   │   └── demo/             DemoDataSource + seed/ data contoh (test & mode demo)
+│   │   └── repositories/         implementasi kontrak domain
+│   └── presentation/
+│       ├── controllers/          Controller per fitur + ControllerProvider
+│       ├── routes/app_routes.dart nama rute, router, proteksi login
+│       ├── styles/               warna status (di luar entity)
+│       ├── widgets/              komponen global yang dipakai ulang
+│       │   ├── layout/           TkbjScaffold, ContentSection, ResponsiveGrid
+│       │   ├── common/           AppButton, AppCard, PillBadge, InfoRow, SectionCard, ReceiptCard,
+│       │   │                     ArtworkImage, VideoPreview, bottom sheet & toast
+│       │   ├── form/             LabeledTextField, ReadOnlyField, UploadField, AppCheckbox
+│       │   └── interactive/      ChipFilter(Bar), QtyStepper, StepTracker, SegmentedTabs, UnderlineTabs
+│       └── pages/                satu folder per fitur, widget khusus fitur di subfolder widgets/
+│           ├── home/  menu/  auth/  profile/  events/  tickets/  checkout/
+│           ├── rental/  gallery/  community/  education/  account/
+│           └── assistant/        Tanya Krida (chat asisten AI)
 ├── test/                         unit, alur fitur, dan responsive test
 └── test_screenshots/             generator screenshot README
 ```

@@ -2,7 +2,7 @@
 
 import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { BackendError, backendFetch } from '@/lib/backend'
+import { BackendError, backendFetch, forwardedFor } from '@/lib/backend'
 import { SESSION_COOKIE } from '@/lib/cookie'
 import { backendErrors, formValues, zodErrors } from '@/lib/schemas'
 import { LoginSchema, RegisterSchema } from '@/lib/validation/auth'
@@ -12,6 +12,9 @@ import type { ActionState } from '@/lib/schemas'
 /*
  * Server Action autentikasi. Backend Express tetap yang memeriksa password (bcrypt) dan menerbitkan JWT
  * (Modul 01); di sini token itu disimpan sebagai cookie HttpOnly agar tidak bisa dicuri lewat JavaScript.
+ * Setiap action = endpoint POST publik: login & daftar memang boleh tanpa sesi, jadi pengamanannya adalah
+ * validasi Zod di sini, validasi ulang + rate limit di backend (IP pengguna diteruskan lewat forwardedFor),
+ * dan respons secukupnya (pesan + error per kolom, tanpa detail internal).
  */
 
 /** Hanya path internal yang boleh jadi tujuan setelah login (mencegah open redirect). */
@@ -34,13 +37,13 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     result = await backendFetch('/auth/login', {
       method: 'POST',
       body: parsed.data,
-      headers: { 'User-Agent': (await headers()).get('user-agent') ?? 'Next.js' },
+      headers: { 'User-Agent': (await headers()).get('user-agent') ?? 'Next.js', ...forwardedFor(await headers()) },
     })
   } catch (error) {
     const e = error as BackendError
     return {
       success: false,
-      message: e.status === 401 ? 'Username atau password salah. Gunakan akun demo di bawah.' : e.message,
+      message: e.status === 401 ? 'Username atau password salah.' : e.message,
       errors: backendErrors(e.fields),
       values,
     }
@@ -63,7 +66,7 @@ export async function registerAction(_prev: ActionState, formData: FormData): Pr
   if (!parsed.success) return { success: false, errors: zodErrors(parsed.error), values }
 
   try {
-    const res = await backendFetch<RegisterResponse>('/auth/register', { method: 'POST', body: parsed.data })
+    const res = await backendFetch<RegisterResponse>('/auth/register', { method: 'POST', body: parsed.data, headers: forwardedFor(await headers()) })
     return { success: true, message: res.message, values: { username: res.user.username } }
   } catch (error) {
     const e = error as BackendError

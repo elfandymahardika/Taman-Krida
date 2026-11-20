@@ -8,8 +8,13 @@ import { SESSION_COOKIE } from './cookie'
  * yang menambahkan header Authorization dari cookie HttpOnly.
  */
 
-/** Alamat API backend dari .env.local (bisa URL Ngrok rekan tim), bawaan: backend lokal port 5000. */
-export const BACKEND_API_URL = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:5000/api').replace(/\/$/, '')
+/**
+ * Alamat API backend, bawaan: backend lokal port 5000.
+ * `API_URL` dibaca saat RUNTIME (saat server jalan), sehingga satu image Docker yang sama bisa dipakai di development,
+ * staging, dan production hanya dengan mengganti environment. `NEXT_PUBLIC_*` sebaliknya DIKUNCI saat `next build`,
+ * jadi hanya dipakai sebagai cadangan untuk .env.local lama (development).
+ */
+export const BACKEND_API_URL = (process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '')
 export const BACKEND_ORIGIN = BACKEND_API_URL.replace(/\/api$/, '')
 
 /** Ngrok Free menampilkan halaman peringatan HTML untuk permintaan tanpa header ini; backend lokal mengabaikannya. */
@@ -22,12 +27,26 @@ export type BackendFields = Record<string, string>
 export class BackendError extends Error {
   status: number
   fields?: BackendFields
+  /** ID permintaan dari backend (header X-Request-Id), untuk dicari di log backend. */
+  requestId?: string
 
-  constructor(message: string, status: number, fields?: BackendFields) {
+  constructor(message: string, status: number, fields?: BackendFields, requestId?: string) {
     super(message)
     this.status = status
     this.fields = fields
+    this.requestId = requestId
   }
+}
+
+/**
+ * IP pengguna untuk pembatas percobaan (rate limit) di backend: entri TERAKHIR X-Forwarded-For, yaitu yang
+ * ditambahkan proxy terdekat (Ngrok) atau diisi Next.js dari koneksi bila tanpa proxy. Tanpa ini backend melihat
+ * semua staf dari satu IP (server Next.js) sehingga satu orang yang salah password berulang kali ikut memblokir
+ * login staf lain. Backend hanya memercayai header ini dari localhost (TRUST_PROXY=loopback).
+ */
+export function forwardedFor(headers: Pick<Headers, 'get'>): Record<string, string> {
+  const ip = headers.get('x-forwarded-for')?.split(',').at(-1)?.trim()
+  return ip ? { 'X-Forwarded-For': ip } : {}
 }
 
 type FetchOptions = { token?: string; method?: string; body?: unknown; headers?: Record<string, string> }
@@ -52,19 +71,31 @@ export async function backendFetch<T = any>(path: string, { token, method = 'GET
   }
   if (res.status === 204) return null as T
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new BackendError(data?.error ?? `Permintaan gagal (${res.status}).`, res.status, data?.fields)
+  if (!res.ok) {
+    const requestId = res.headers.get('x-request-id') ?? undefined
+    throw new BackendError(data?.error ?? `Permintaan gagal (${res.status}).`, res.status, data?.fields, requestId)
+  }
   return data
 }
 
 const REQUEST_HEADERS = ['content-type', 'accept', 'user-agent']
-const RESPONSE_HEADERS = ['content-type', 'content-disposition', 'cache-control', 'last-modified', 'etag', 'x-content-type-options']
+const RESPONSE_HEADERS = [
+  'content-type',
+  'content-disposition',
+  'cache-control',
+  'last-modified',
+  'etag',
+  'x-content-type-options',
+  'x-request-id',
+  'retry-after',
+]
 
 /**
  * Teruskan permintaan browser ke backend apa adanya (body di-stream, termasuk unggahan berkas),
  * dengan token dari cookie HttpOnly sebagai `Authorization: Bearer`.
  */
 export async function forwardToBackend(req: NextRequest, target: string, { withAuth = true } = {}) {
-  const headers = new Headers(NGROK_HEADER)
+  const headers = new Headers({ ...NGROK_HEADER, ...forwardedFor(req.headers) })
   for (const name of REQUEST_HEADERS) {
     const value = req.headers.get(name)
     if (value) headers.set(name, value)

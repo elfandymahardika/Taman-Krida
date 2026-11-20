@@ -76,7 +76,7 @@ Semua respons berformat JSON. Error validasi dikirim sebagai `400 { error, field
 
 | Method & path | Keterangan |
 |---|---|
-| `GET /api/health` | Cek server |
+| `GET /health` · `GET /api/health` | Health check: 200 bila server hidup **dan** MySQL bisa dihubungi, 503 bila database putus atau sedang graceful shutdown |
 | `GET /api/meta` | Kategori acara/komunitas, slot sewa, dokumen wajib, metode bayar, batas tiket, rekening |
 | `GET /api/home` | Profil singkat, banner, 4 agenda terdekat, 3 berita terbaru |
 | `GET /api/profile` · `GET /api/facilities` | Profil lembaga & fasilitas (tarif sewa, bisa disewa atau tidak) |
@@ -86,6 +86,7 @@ Semua respons berformat JSON. Error validasi dikirim sebagai `400 { error, field
 | `GET /api/contents?type=` · `/contents/:id` | Berita, pengumuman, artikel budaya |
 | `GET /api/communities?category=&q=` · `/communities/:id` | Direktori komunitas aktif |
 | `GET /api/rentals/availability?facilityId=&month=YYYY-MM` | Kalender sewa: tiap slot `available` / `full` / `past` |
+| `POST /api/assistant/chat` | **Tanya Krida (asisten AI)**: `{ messages: [{ role: 'user' \| 'assistant', content }] }` → `{ reply, links: [{ kind, id?, label }], suggestions }`. Lihat [Tanya Krida](#tanya-krida-asisten-ai) |
 | `POST /api/auth/register` | `{ name, email, phone, password, confirm?, city? }` menghasilkan token dan langsung masuk |
 | `POST /api/auth/login` | `{ email, password }` menghasilkan `{ token, expiresIn, user }`. Akun dikunci 15 menit setelah 5 kali gagal; maksimal 20 percobaan gagal per IP per 15 menit (`rateLimiter.ts`) |
 
@@ -133,18 +134,59 @@ Semua respons berformat JSON. Error validasi dikirim sebagai `400 { error, field
 - **Token terpisah dari staf:** JWT pengunjung memakai klaim `aud: tkbj-mobile` dan tabel `visitor_sessions`, jadi token dashboard ditolak di sini, dan sebaliknya.
 - **Berkas privat:** KTP, surat, dan bukti transfer disimpan di **Vercel Blob** (`access: private`) bila `BLOB_READ_WRITE_TOKEN` diisi, atau dengan nama acak di `UPLOADS_DIR`. Berkas **tidak disajikan statis**: hanya bisa diunduh pemiliknya, dan admin membukanya lewat API dashboard yang memeriksa peran. Tipe berkas dicek dari *magic number*. Kalau penyimpanan ke database gagal, berkasnya ikut dihapus.
 
+## Tanya Krida (asisten AI)
+
+Fitur AI aplikasi mobile. Pengunjung bertanya dengan bahasa sehari-hari, lalu AI menjawab **dari database yang sama dengan dashboard dan dari materi budaya aplikasi**, bukan dari karangan. Contoh pertanyaan: *"Apa itu Taman Krida Budaya?"*, *"Ceritakan sejarah Tari Remo"*, *"Ada wayang minggu depan?"*, *"Pendopo kosong tanggal 20?"*.
+
+```
+Flutter (layar chat) ──► POST /api/assistant/chat ──► Google Gemini API
+                              │      ▲                      │ "panggil alat cari_acara / materi_budaya"
+                              │      └── kirim_jawaban ◄────┤
+                              └─► alat baca-saja (src/lib/assistantTools.ts) → MySQL & materi budaya
+```
+
+- **Model AI:** **Google Gemini**, kunci gratis dari [Google AI Studio](https://aistudio.google.com/apikey), SDK resmi `@google/genai`, model bawaan `gemini-3.5-flash-lite` ([`src/lib/ai/gemini.ts`](src/lib/ai/gemini.ts)). Jawaban akhir diserahkan model lewat alat penutup `kirim_jawaban`.
+- **Controller:** [`src/controllers/assistantController.ts`](src/controllers/assistantController.ts). Model memilih alat (*function calling*), server menjalankannya, hasilnya dikirim balik, berulang sampai model menjawab (maks. 5 putaran; putaran terakhir dipaksa menjawab). Instruksi (system prompt) dan bentuk jawaban: [`src/lib/assistantPrompt.ts`](src/lib/assistantPrompt.ts).
+- **Alat** ([`src/lib/assistantTools.ts`](src/lib/assistantTools.ts)), semuanya **hanya membaca data publik**:
+
+  | Alat | Isi |
+  |---|---|
+  | `cari_acara` | Acara terpublikasi (filter tanggal, kategori, kata kunci): jam, lokasi, harga, sisa kursi |
+  | `info_fasilitas` | Venue, kapasitas, bisa disewa atau tidak, tarif |
+  | `cek_jadwal_sewa` | Slot Pagi/Siang/Malam per tanggal atau tanggal kosong sebulan (logika sama dengan `GET /rentals/availability`) |
+  | `cari_komunitas` | Komunitas aktif di direktori |
+  | `info_layanan` | Profil & kontak, aturan tiket (batas, batas bayar, pembatalan), alur & berkas sewa, 3 berita terbaru |
+  | `materi_budaya` | Tentang TKBJ dan sejarah, linimasa, serta makna kesenian: Tari Remo, Topeng Malangan, Gandrung, Beskalan, Jaranan & Reog, Ludruk, Ketoprak, Wayang Kulit, Gamelan, Arsitektur Joglo |
+
+- **Materi budaya** ada di [`src/lib/cultureKnowledge.ts`](src/lib/cultureKnowledge.ts). Materi yang juga ada di Edukasi Budaya aplikasi memakai id yang sama, sehingga jawaban konsisten dan AI bisa memberi tombol *Baca materi*. Topik di luar materi boleh dijawab dari pengetahuan umum model, tetapi AI diminta tidak mengarang tahun atau nama. **Tanggal pendirian TKBJ sengaja belum diisi** karena belum ada sumber resmi; lengkapi entri `tkbj` bila sudah ada data dari pengelola.
+- **Jawaban terstruktur:** `jawaban`, `tautan` (tombol ke layar aplikasi), dan `saran_pertanyaan`. Id tombol **dicek ulang ke database atau materi** dan labelnya dibuat server, jadi tombol tidak pernah mengarah ke acara atau materi yang tidak ada.
+- **Keamanan & kuota:** kunci API hanya di `.env` server, tidak pernah dikirim ke aplikasi. Tidak ada alat yang membaca data akun atau mengubah database. Riwayat dibatasi 12 pesan terakhir, pertanyaan ≤ 500 karakter, dan ada pembatas per IP (`AI_RATE_LIMIT_MAX`, bawaan 20 pertanyaan/15 menit). Error API AI dibalas pesan umum (kunci salah → 503, kuota habis → 429, gangguan → 502), detailnya hanya di log. Jawaban yang diblokir pengaman model dibalas pesan sopan.
+- **Kuota gratis Gemini** dihitung per proyek Google dan per hari. Satu pertanyaan biasanya memakai 2–3 permintaan ke Gemini (panggil alat, lalu jawab). Bila kuota habis, pengguna mendapat pesan *"Kuota Tanya Krida sedang habis"* dan fitur lain tetap jalan. Catatan privasi: di tier gratis, Google dapat memakai isi permintaan untuk meningkatkan produknya, jadi AI tidak pernah diberi data pribadi.
+- **Konfigurasi** (`.env`): `GEMINI_API_KEY` (awalan `AQ.` atau `AIza`; kosong = fitur nonaktif, endpoint 503) dan `AI_MODEL` (kosong = `gemini-3.5-flash-lite`).
+- **Test** memakai server tiruan Gemini (tanpa kunci asli dan tanpa kuota): memeriksa loop alat, hasil alat dari database dan materi budaya, *thought signature* Gemini, riwayat percakapan, penggantian model, putaran terakhir yang dipaksa menjawab, validasi tombol, pemblokiran, kuota habis, kunci salah, dan validasi input.
+
+## Keamanan, error & logging
+
+Sama dengan API dashboard (lihat README `backend/admin-dashboard`, bagian *Keamanan, error & logging*). Urutan middleware di `src/app.ts`: **request logger → Helmet → CORS → rate limiter → parser body → routes → 404 → error handler**.
+
+- **Helmet** memasang header keamanan; `X-Powered-By` dimatikan.
+- **CORS** (hanya berpengaruh ke Flutter web): `CORS_ORIGINS` kosong = semua origin saat development, tidak ada origin browser bila `NODE_ENV=production`. Aplikasi Android/iOS tidak terkena CORS.
+- **Rate limit** (`src/middleware/rateLimiter.ts`): umum `/api` 300 permintaan/15 menit per IP (`RATE_LIMIT_MAX`, `RATE_LIMIT_WINDOW_MIN`), login 20 gagal/15 menit per IP + kunci akun 5 kali gagal, registrasi 10/jam → **429** + `Retry-After`. Di belakang Ngrok, `TRUST_PROXY=loopback` (bawaan) membuat batas dihitung per IP pengguna.
+- **Status error:** input salah **400**, belum login/token salah **401**, data milik orang lain atau tidak ada **404** (anti-IDOR), rute tak dikenal **404**, error tak terduga **500** dengan pesan umum (stack hanya di log).
+- **Logging** (`src/logger.ts`, `src/middleware/requestLogger.ts`, pino + pino-http): satu baris per permintaan dengan `requestId`, method, path tanpa query, status, dan durasi. Header, body, dan query tidak dicatat; password/token disensor. Header `X-Request-Id` dan field `requestId` di respons error memakai ID yang sama dengan log. `LOG_LEVEL` mengatur level log.
+
 ## Pengujian
 
 ```bash
 npm run typecheck
-npm test     # 23 test end-to-end, database terpisah: tkbj_mobile_test
+npm test     # 33 test end-to-end, database terpisah: tkbj_mobile_test
 ```
 
 Test mengimpor API dashboard yang asli dari `../admin-dashboard`, jadi folder itu juga harus sudah `npm install`. Dashboard dipakai untuk membuat skema dan data contoh, serta untuk keputusan admin: memverifikasi atau menolak bukti, menyetujui atau menolak sewa, dan menyetujui komunitas. Dengan begitu alur aplikasi → dashboard → aplikasi teruji utuh. Ada juga test untuk validasi, kuota, jadwal bentrok, anti-IDOR, berkas palsu, logout, dan ganti kata sandi.
 
 ## Integrasi Flutter
 
-Aplikasi [`mobile-app`](../../mobile-app) sudah memakai API ini lewat `ApiRepository` (`lib/data/repository/api_repository.dart`). Alamatnya bawaan `http://10.0.2.2:5001/api` (emulator Android) atau `http://localhost:5001/api`, dan bisa diganti dengan `--dart-define=API_URL=...`. Token login disimpan di perangkat. Tanpa server, aplikasi bisa dijalankan dengan `--dart-define=DEMO_MODE=true`.
+Aplikasi [`mobile-app`](../../mobile-app) sudah memakai API ini lewat *remote data source* per fitur (`lib/data/datasources/remote/`, mis. `RentalRemoteDataSourceImpl`) yang dirakit di `lib/injection.dart`. Alamatnya bawaan `http://10.0.2.2:5001/api` (emulator Android) atau `http://localhost:5001/api`, dan bisa diganti dengan `--dart-define=API_URL=...`. Token login disimpan di perangkat. Tanpa server, aplikasi bisa dijalankan dengan `--dart-define=DEMO_MODE=true`.
 
 Hal yang mengikuti dashboard:
 

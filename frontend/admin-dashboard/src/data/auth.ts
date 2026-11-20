@@ -11,15 +11,6 @@ export { useSession } from '../lib/session'
  * Validasi isian memakai schema Zod di lib/validation/auth.ts. Backend menyimpan password sebagai hash bcrypt.
  */
 
-/** Akun demo per peran dari data contoh backend (ditampilkan di halaman login). */
-export const DEMO_ACCOUNTS = [
-  { username: 'admin', password: 'admin123', role: 'Administrator utama' },
-  { username: 'nur.aini', password: 'tkbj2026', role: 'Admin Acara' },
-  { username: 'keuangan', password: 'keuangan123', role: 'Admin Keuangan' },
-  { username: 'rina.s', password: 'tkbj2026', role: 'Admin Sewa' },
-  { username: 'siti.rahma', password: 'tkbj2026', role: 'Admin Konten' },
-]
-
 export const auth = {
   /** Muat ulang profil & hak akses dari server (mis. setelah peran diubah admin). */
   refresh: refreshUser,

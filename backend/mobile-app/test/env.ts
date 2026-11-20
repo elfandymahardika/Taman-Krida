@@ -11,3 +11,12 @@ process.env.MOBILE_UPLOADS_DIR = process.env.UPLOADS_DIR;
 // Test tidak memakai Vercel Blob walau token ada di .env.
 process.env.BLOB_READ_WRITE_TOKEN = '';
 process.env.APP_TODAY = '2026-10-02';
+// Log permintaan tidak dicetak saat test (lihat src/logger.ts).
+process.env.LOG_LEVEL = 'silent';
+// Seluruh test berjalan dari satu IP (localhost); batas umum /api dilonggarkan agar suite tidak terkena 429.
+process.env.RATE_LIMIT_MAX = process.env.RATE_LIMIT_MAX || '5000';
+// Tanya Krida: test tidak pernah memanggil API AI sungguhan. Test asisten memasang kunci palsu + server tiruan sendiri.
+process.env.AI_MODEL = '';
+process.env.GEMINI_API_KEY = '';
+process.env.GEMINI_BASE_URL = '';
+process.env.AI_RATE_LIMIT_MAX = process.env.AI_RATE_LIMIT_MAX || '5000';

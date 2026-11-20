@@ -36,6 +36,14 @@ export const wibDateTime = (iso: string) => `${dayFmt.format(new Date(iso))} · 
 /** "2026-10-02" → "Jumat, 2 Oktober 2026" */
 export const longDate = (isoDate: string) => longDayFmt.format(new Date(`${isoDate}T12:00:00+07:00`))
 
+/** Tanggal hari ini menurut WIB → "2026-11-12". */
+export const todayWib = (now = Date.now()) => new Date(now + 7 * 3600e3).toISOString().slice(0, 10)
+
+const clockFmt = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: TZ })
+
+/** Waktu sekarang (ms) → "Kamis, 12 November 2026 · 14.05.32 WIB" */
+export const clockText = (now: number) => `${longDayFmt.format(now)} · ${clockFmt.format(now)} WIB`
+
 /** Waktu relatif untuk kejadian < 24 jam, selain itu tanggal & jam. */
 export function relativeTime(iso: string, now = Date.now()) {
   const diff = Math.max(0, now - Date.parse(iso)) / 1000

@@ -1,29 +1,70 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import { config } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { apiLimiter } from './middleware/rateLimiter';
+import { requestLogger } from './middleware/requestLogger';
+import { healthCheck } from './lib/health';
 import apiRoutes from './routes/api';
 import authRoutes from './routes/authRoutes';
+import { openServedBlob } from './services/storage.service';
 
+/*
+ * Urutan middleware (penting): request logger → Helmet → CORS → rate limiter → parser body → routes
+ * → handler 404 → error handler. Express 5: error/promise yang ditolak di handler async otomatis
+ * diteruskan ke error handler, jadi controller cukup `throw` (tidak perlu try/catch + next(err) seperti Express 4).
+ */
 const app: Application = express();
 app.disable('x-powered-by');
 
-// Pasang middleware CORS sebelum route API. Origin diambil dari FRONTEND_URL (bisa lebih dari satu, pisahkan koma)
-// agar frontend rekan tim (mis. lewat Ngrok) boleh memanggil API.
+// Backend berada di belakang proxy (Next.js /api/be, Ngrok): percayai X-Forwarded-For sesuai TRUST_PROXY
+// agar req.ip (kunci rate limiter & log) = IP pengguna, bukan IP proxy. Lihat config/env.ts.
+app.set('trust proxy', config.trustProxy);
+
+// 1. Logger permintaan paling awal: semua permintaan (termasuk yang ditolak 401/404/429) tercatat dengan request ID.
+app.use(requestLogger);
+
+// 2. Header keamanan (X-Content-Type-Options, X-Frame-Options, CSP, HSTS, dst.). CORP `cross-origin` karena
+//    foto galeri /uploads juga dimuat oleh aplikasi mobile dari origin lain.
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+
+// 3. CORS: hanya origin di FRONTEND_URL (pisahkan koma, mis. origin Ngrok rekan tim). Di production wajib diisi
+//    (lihat config/env.ts). Dipasang sebelum rate limiter agar respons 429 tetap terbaca oleh browser.
 app.use(
   cors({
     origin: config.frontendUrls,
     credentials: true,
-    exposedHeaders: ['Content-Disposition'],
+    exposedHeaders: ['Content-Disposition', 'X-Request-Id', 'Retry-After'],
   }),
 );
 
-// Konfigurasi Middlewares Express
+// Health check (Docker HEALTHCHECK, Nginx, skrip deploy): di luar /api agar tidak terkena rate limiter.
+// Mengecek koneksi MySQL; 503 bila database putus atau server sedang graceful shutdown. Lihat lib/health.ts.
+app.get('/health', healthCheck);
+
+// 4. Pembatas umum semua rute /api (login & registrasi punya batas lebih ketat di authRoutes.ts).
+app.use('/api', apiLimiter);
+
+// 5. Parser body
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Berkas galeri & dokumen disajikan statis di /uploads (nama file acak). `nosniff` mencegah browser
+// 6. Berkas galeri & dokumen disajikan statis di /uploads (nama file acak). `nosniff` mencegah browser
 // menafsirkan berkas sebagai tipe lain (mis. HTML) selain Content-Type-nya.
+// Versi Vercel Blob privat (/uploads/<folder>/<nama>) dialirkan backend dengan token.
+app.get('/uploads/:folder/:name', async (req: Request<{ folder: string; name: string }>, res: Response, next) => {
+  try {
+    const blob = await openServedBlob(req.params.folder, req.params.name);
+    if (!blob) return next();
+    res.setHeader('Content-Type', blob.contentType);
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'public, max-age=604800');
+    blob.stream.on('error', next).pipe(res);
+  } catch (err) {
+    next(err);
+  }
+});
 app.use(
   '/uploads',
   express.static(config.uploadsDir, {
@@ -33,7 +74,7 @@ app.use(
   }),
 );
 
-// Menyambungkan rute: /api/auth (authRoutes.ts) lalu rute lain (api.ts)
+// 7. Rute: /api/auth (authRoutes.ts) lalu rute lain (api.ts)
 app.use('/api/auth', authRoutes);
 app.use('/api', apiRoutes);
 
@@ -45,6 +86,7 @@ app.get('/', (_req: Request, res: Response) => {
   });
 });
 
+// 8. Rute tidak dikenal → 404, lalu 9. error handler paling akhir.
 app.use(notFoundHandler);
 app.use(errorHandler);
 

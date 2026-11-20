@@ -1,10 +1,10 @@
 'use client'
 
 import { Building2, Calendar, CalendarDays, ChevronDown, Ticket, Wallet } from 'lucide-react'
-import { AnimatedNumber, Metrics, Period } from '@/components/ui'
+import { AnimatedNumber, LiveClock, Metrics, Period } from '@/components/ui'
 import { useOverlay } from '@/components/overlay'
 import { formatJuta, round } from '@/data/finance'
-import { longDate, periodShort, wibTime } from '@/data/format'
+import { periodShort, wibTime } from '@/data/format'
 import { useAccess } from '@/lib/access'
 import type { Module } from '@/lib/access'
 import type { MetricProps } from '@/components/ui'
@@ -45,9 +45,10 @@ export default function Ringkasan({ summary: s, onPeriod }: { summary: any; onPe
       <Period
         label="Ringkasan"
         stamp={
-          s
-            ? `Diperbarui ${wibTime(s.generatedAt)} · otomatis tiap 30 detik · hari ini pada data contoh: ${longDate(s.today)}`
-            : 'Memuat ringkasan dari server…'
+          <>
+            <LiveClock />
+            {s ? ` · data diperbarui ${wibTime(s.generatedAt)} (otomatis tiap 30 detik)` : ' · memuat ringkasan dari server…'}
+          </>
         }
       >
         <button className="period-picker" onClick={choosePeriod} disabled={!s}>

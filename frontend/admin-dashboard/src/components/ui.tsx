@@ -6,6 +6,7 @@ import type { StaticImageData } from 'next/image'
 import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowDownRight, ArrowUpRight, ChevronDown, ChevronRight, Info, Search } from 'lucide-react'
+import { clockText, monthLabel, todayWib } from '@/data/format'
 
 /* Warna status mengikuti desain: hijau = selesai/aktif, kuning = perlu tindakan,
    merah marun = sorotan, abu = menunggu/draf. */
@@ -54,11 +55,35 @@ export function PageHeader({ title, subtitle, actions }: { title: ReactNode; sub
   )
 }
 
-export const DATA_STAMP = 'Data contoh dari backend · hari ini pada data contoh: Jumat, 2 Oktober 2026'
+/**
+ * Waktu sekarang (ms) yang diperbarui berkala. Bernilai null saat render server
+ * & render pertama agar tidak terjadi mismatch hidrasi.
+ */
+export function useNow(intervalMs = 1000) {
+  const [now, setNow] = useState<number | null>(null)
+  useEffect(() => {
+    setNow(Date.now())
+    const id = window.setInterval(() => setNow(Date.now()), intervalMs)
+    return () => window.clearInterval(id)
+  }, [intervalMs])
+  return now
+}
+
+/** Jam berjalan: "Kamis, 12 November 2026 · 14.05.32 WIB". */
+export function LiveClock() {
+  const now = useNow()
+  return <time dateTime={now ? new Date(now).toISOString() : undefined}>{now ? clockText(now) : '…'}</time>
+}
+
+/** Nama bulan berjalan (WIB), mis. "November 2026". */
+function CurrentMonth() {
+  const now = useNow(60_000)
+  return <>{now ? monthLabel(todayWib(now).slice(0, 7)) : '…'}</>
+}
 
 export function Period({
-  label = 'Oktober 2026',
-  stamp = DATA_STAMP,
+  label = <CurrentMonth />,
+  stamp = <LiveClock />,
   children,
 }: {
   label?: ReactNode
@@ -309,7 +334,8 @@ export function Cell({ main, sub, size }: { main: ReactNode; sub?: ReactNode; si
 }
 
 /**
- * Tabel berbasis grid dengan lebar kolom tetap sesuai desain.
+ * Tabel berbasis grid. Lebar angka dari desain dipakai sebagai proporsi (fr),
+ * jadi semua kolom selalu muat di lebar kartu tanpa gulir ke samping.
  * columns: [{ label, width, render(row) }]
  */
 export type Column<T> = { label: string; width: number | string; render: (row: T) => ReactNode }
@@ -330,7 +356,7 @@ export function DataTable<T = any>({
   getKey?: (row: T) => string | number
   footer?: ReactNode
 }) {
-  const template = columns.map((c) => (typeof c.width === 'number' ? `${c.width}px` : c.width)).join(' ')
+  const template = columns.map((c) => (typeof c.width === 'number' ? `minmax(0, ${c.width}fr)` : c.width)).join(' ')
   return (
     <div className="table-wrap">
       <div className="table" role="table">
@@ -516,6 +542,8 @@ export function Photo({
   letterbox?: boolean
   radius?: CSSProperties['borderRadius']
 }) {
+  // `sizes` mengikuti lebar kartu: thumbnail 66px cukup diunduh ~66px (×DPR), bukan 480px.
+  const sizes = typeof width === 'number' ? `${width}px` : '(max-width: 768px) 100vw, 480px'
   return (
     <div
       className={`photo ${letterbox ? 'photo--letterbox' : ''}`}
@@ -524,9 +552,10 @@ export function Photo({
       {url && video ? (
         <video className="photo__video" src={url} muted playsInline preload="metadata" aria-label={alt} />
       ) : url ? (
-        <Image src={url} alt={alt} fill unoptimized sizes="(max-width: 768px) 100vw, 480px" />
+        // Foto unggahan (/uploads/...) dioptimasi Next.js (lihat images.localPatterns di next.config.mjs).
+        <Image src={url} alt={alt} fill sizes={sizes} />
       ) : (
-        <Image src={src} alt={alt} sizes="(max-width: 768px) 100vw, 480px" />
+        <Image src={src} alt={alt} sizes={sizes} />
       )}
     </div>
   )

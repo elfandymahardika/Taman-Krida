@@ -1,0 +1,5 @@
+# Skrip & konfigurasi dipakai di server Linux: selalu LF.
+*.sh text eol=lf
+*.conf text eol=lf
+*.example text eol=lf
+*.yml text eol=lf

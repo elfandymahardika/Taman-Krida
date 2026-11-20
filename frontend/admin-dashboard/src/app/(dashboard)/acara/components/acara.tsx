@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { Filters, PageFooter } from '@/components/ui'
 import { VENUES, sortByDate, useEvents } from '@/data/events'
-import { addMonths, monthLabel } from '@/data/format'
+import { addMonths, monthLabel, todayWib } from '@/data/format'
 import { useQuery } from '@/lib/api'
 import Hero from './hero'
 import KalenderAcara from './kalenderacara'
@@ -18,7 +18,7 @@ const ALL_PERIODS = 'Semua periode'
 export default function Acara() {
   const events = useEvents()
   // "Hari ini" pada data contoh dari server (APP_TODAY), sama dengan dashboard.
-  const today: string = useQuery('/dashboard/summary').data?.today ?? '2026-10-02'
+  const today: string = useQuery('/dashboard/summary').data?.today ?? todayWib()
   // null = ikuti hari ini (sampai pengguna memilih bulan/tanggal lain).
   const [month, setMonth] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)

@@ -64,6 +64,15 @@ export interface Media {
 
 interface MediaRow extends RowDataPacket, Media {}
 
+/**
+ * Unggahan admin: blob publik = URL apa adanya; blob privat (/uploads/<folder>/<nama>) dan berkas lokal
+ * (/uploads/<nama>) disajikan API dashboard.
+ */
+const mediaUrl = (file: string) => {
+  if (!/^https?:\/\//.test(file)) return `${config.adminPublicUrl}/uploads/${file}`;
+  return process.env.BLOB_ACCESS === 'public' ? file : `${config.adminPublicUrl}/uploads${new URL(file).pathname}`;
+};
+
 /** `photo` = kunci foto bawaan aplikasi; `url` = berkas unggahan admin (disajikan API dashboard). */
 export const toMedia = (m: Media) => ({
   id: m.id,
@@ -72,8 +81,7 @@ export const toMedia = (m: Media) => ({
   date: m.date,
   type: m.type,
   photo: m.photo ?? undefined,
-  // Unggahan admin: URL Vercel Blob apa adanya, atau berkas lokal yang disajikan API dashboard.
-  url: m.file ? (/^https?:\/\//.test(m.file) ? m.file : `${config.adminPublicUrl}/uploads/${m.file}`) : undefined,
+  url: m.file ? mediaUrl(m.file) : undefined,
   mime: m.mime ?? undefined,
   credit: m.credit,
   description: m.description ?? '',

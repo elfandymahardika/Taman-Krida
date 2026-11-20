@@ -28,8 +28,20 @@ const EXT_BY_MIME: Record<string, string> = {
 /** Berkas di Vercel Blob dikenali dari kuncinya yang berupa URL. */
 export const isCloudKey = (fileKey: string) => /^https?:\/\//.test(fileKey);
 
-/** URL tampil sebuah berkas: URL blob apa adanya, berkas lokal disajikan di /uploads/<nama>. */
-export const publicUrl = (fileKey: string) => (isCloudKey(fileKey) ? fileKey : `/uploads/${path.basename(fileKey)}`);
+/** Mode akses Vercel Blob (BLOB_ACCESS), harus sama dengan setelan store di dashboard Vercel. Bawaan: private. */
+export const blobAccess = (): 'public' | 'private' => (process.env.BLOB_ACCESS === 'public' ? 'public' : 'private');
+
+/** Folder blob yang boleh dibaca tanpa login lewat /uploads. Berkas pengunjung hanya lewat endpoint ber-auth. */
+const SERVED_BLOB_FOLDERS = ['galeri', 'documents'];
+
+/**
+ * URL tampil sebuah berkas: berkas lokal di /uploads/<nama>; blob publik = URL blob apa adanya;
+ * blob privat tidak bisa dibuka langsung, jadi disajikan backend di /uploads/<folder>/<nama>.
+ */
+export const publicUrl = (fileKey: string) => {
+  if (!isCloudKey(fileKey)) return `/uploads/${path.basename(fileKey)}`;
+  return blobAccess() === 'public' ? fileKey : `/uploads${new URL(fileKey).pathname}`;
+};
 
 /**
  * Storage dual-mode:
@@ -60,11 +72,11 @@ export class StorageService {
     // 1. Cloud Storage (jika token terpasang)
     if (this.cloudToken) {
       const blob = await put(`${folder}/${safeFilename}`, fileBuffer, {
-        access: 'public',
+        access: blobAccess(),
         contentType: mimeType,
         token: this.cloudToken,
       });
-      return { name: originalName, fileKey: blob.url, fileType: mimeType, fileSize: fileBuffer.length, url: blob.url };
+      return { name: originalName, fileKey: blob.url, fileType: mimeType, fileSize: fileBuffer.length, url: publicUrl(blob.url) };
     }
 
     // 2. Fallback penyimpanan lokal
@@ -101,11 +113,19 @@ export const storageService = new StorageService();
  */
 export async function openVisitorFile(fileKey: string): Promise<Readable | null> {
   if (isCloudKey(fileKey)) {
-    const access = process.env.BLOB_ACCESS === 'public' ? 'public' : 'private';
-    const result = await get(fileKey, { access, token: process.env.BLOB_READ_WRITE_TOKEN || undefined });
+    const result = await get(fileKey, { access: blobAccess(), token: process.env.BLOB_READ_WRITE_TOKEN || undefined });
     if (!result || result.statusCode !== 200) return null;
     return Readable.fromWeb(result.stream as import('stream/web').ReadableStream);
   }
   const local = path.join(config.mobileUploadsDir, path.basename(fileKey));
   return fs.existsSync(local) ? fs.createReadStream(local) : null;
+}
+
+/** Blob galeri/dokumen untuk GET /uploads/<folder>/<nama> (store privat). null bila tidak ada. */
+export async function openServedBlob(folder: string, name: string) {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token || !SERVED_BLOB_FOLDERS.includes(folder)) return null;
+  const result = await get(`${folder}/${path.basename(name)}`, { access: blobAccess(), token }).catch(() => null);
+  if (!result || result.statusCode !== 200) return null;
+  return { stream: Readable.fromWeb(result.stream as import('stream/web').ReadableStream), contentType: result.blob.contentType };
 }

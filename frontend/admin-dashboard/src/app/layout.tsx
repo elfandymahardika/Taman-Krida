@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { Inter, Playfair_Display, Poppins } from 'next/font/google'
 import { OverlayProvider } from '../components/overlay'
+import { WebVitals } from '../components/webvitals'
 import '../index.css'
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-inter' })
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="id" className={`${inter.variable} ${playfair.variable} ${poppins.variable}`}>
       <body>
+        <WebVitals />
         <OverlayProvider>{children}</OverlayProvider>
       </body>
     </html>

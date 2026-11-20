@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { ErrorBanner, PageFooter } from '@/components/ui'
 import { useEvents } from '@/data/events'
+import { todayWib } from '@/data/format'
 import { invalidate, useQuery } from '@/lib/api'
 import { useAccess } from '@/lib/access'
 import Hero from './hero'
@@ -33,7 +34,7 @@ export default function Dashboard() {
       {seesPayments && <GrafikPenjualan />}
 
       <div className="split split--stretch">
-        <AgendaTerdekat events={events} today={s?.today ?? '2026-10-02'} />
+        <AgendaTerdekat events={events} today={s?.today ?? todayWib()} />
         <TugasAdmin summary={s} />
       </div>
 

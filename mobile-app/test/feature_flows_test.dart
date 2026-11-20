@@ -2,19 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tkbj_mobile/app.dart';
 import 'package:tkbj_mobile/core/utils/formatters.dart';
-import 'package:tkbj_mobile/data/models/rental_request.dart';
-import 'package:tkbj_mobile/data/models/ticket_order.dart';
-import 'package:tkbj_mobile/routes/app_routes.dart';
-import 'package:tkbj_mobile/state/app_state.dart';
-import 'package:tkbj_mobile/widgets/interactive/chip_filter.dart';
+import 'package:tkbj_mobile/data/datasources/demo/demo_data_source.dart';
+import 'package:tkbj_mobile/data/datasources/remote/api_client.dart';
+import 'package:tkbj_mobile/domain/entities/assistant_message.dart';
+import 'package:tkbj_mobile/domain/entities/rental_request.dart';
+import 'package:tkbj_mobile/domain/entities/ticket_order.dart';
+import 'package:tkbj_mobile/injection.dart';
+import 'package:tkbj_mobile/presentation/routes/app_routes.dart';
+import 'package:tkbj_mobile/presentation/widgets/interactive/chip_filter.dart';
 
 import 'helpers/screen_harness.dart';
 
-Future<void> _open(WidgetTester tester, AppState state, String route) async {
+Future<void> _open(
+  WidgetTester tester,
+  AppContainer state,
+  String route,
+) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(TkbjApp(state: state));
+  await tester.pumpWidget(TkbjApp(container: state));
   await tester.pumpAndSettle();
   tester.state<NavigatorState>(find.byType(Navigator).first).pushNamed(route);
   await tester.pumpAndSettle();
@@ -30,15 +37,15 @@ Future<void> _tapText(WidgetTester tester, String text) async {
 
 /// Draf sewa lengkap sampai formulir, di slot pertama yang masih tersedia.
 Future<(DateTime, RentalSlot)> _draftRental(
-  AppState state,
+  AppContainer state,
   String activity,
 ) async {
-  state.startRental(facility: pendopo);
+  state.rental.startRental(facility: pendopo);
   final (date, slot) = await firstAvailableBooking(state, pendopo);
-  state
-    ..selectRentalDate(date)
-    ..selectRentalSlot(slot)
-    ..saveRentalForm(
+  state.rental
+    ..selectDate(date)
+    ..selectSlot(slot)
+    ..saveForm(
       activityName: activity,
       applicantName: 'SMA Negeri 1 Malang',
       contact: '081234567890',
@@ -67,13 +74,13 @@ void main() {
 
   test('alur sewa gedung: ajukan → disetujui → bayar → lunas', () async {
     final state = await signedInState();
-    final unreadBefore = state.unreadCount;
+    final unreadBefore = state.notification.unreadCount;
     final (date, slot) = await _draftRental(state, 'Pentas Seni Sekolah');
     for (final doc in RentalDocument.all) {
-      state.attachRentalDocument(doc.key, fakeFile('${doc.key}.pdf'));
+      state.rental.attachDocument(doc.key, fakeFile('${doc.key}.pdf'));
     }
 
-    final request = await state.submitRental();
+    final request = await state.rental.submit();
     expect(request.status, RentalStatus.pending);
     expect(request.documentCount, 3);
     expect(
@@ -82,32 +89,35 @@ void main() {
       reason: 'tarif Pendopo per pemakaian',
     );
     // Slot yang sudah diajukan tidak boleh dipesan lagi.
-    await state.loadAvailability(pendopo, date);
-    expect(state.isSlotTaken(pendopo, date, slot), isTrue);
+    await state.rental.loadAvailability(pendopo, date);
+    expect(state.rental.isSlotTaken(pendopo, date, slot), isTrue);
 
-    await state.simulateAdmin((demo) => demo.approveRental(request.code));
-    expect(state.findRental(request.code)!.status, RentalStatus.approved);
+    await state.admin.approveRental(request.code);
+    expect(
+      state.rental.findRental(request.code)!.status,
+      RentalStatus.approved,
+    );
 
-    await state.payRental(
+    await state.rental.pay(
       request.code,
       PaymentMethod.virtualAccount,
       fakeFile('bukti.pdf'),
       'SMA Negeri 1 Malang',
     );
-    expect(state.findRental(request.code)!.isVerifyingPayment, isTrue);
+    expect(state.rental.findRental(request.code)!.isVerifyingPayment, isTrue);
 
-    await state.simulateAdmin((demo) => demo.confirmPayment(request.code));
-    final paid = state.findRental(request.code)!;
+    await state.admin.confirmPayment(request.code);
+    final paid = state.rental.findRental(request.code)!;
     expect(paid.status, RentalStatus.paid);
     expect(paid.paymentMethod, PaymentMethod.virtualAccount);
     // Terkirim, disetujui, lunas.
-    expect(state.unreadCount, unreadBefore + 3);
+    expect(state.notification.unreadCount, unreadBefore + 3);
   });
 
   test('pengajuan ditolak menyimpan catatan admin', () async {
     final state = await signedInState();
-    await state.simulateAdmin((demo) => demo.rejectRental('SG-1026-0020'));
-    final rental = state.findRental('SG-1026-0020')!;
+    await state.admin.rejectRental('SG-1026-0020');
+    final rental = state.rental.findRental('SG-1026-0020')!;
     expect(rental.status, RentalStatus.rejected);
     expect(rental.adminNote, contains('bentrok'));
     expect(rental.fixes, isNotEmpty);
@@ -139,17 +149,17 @@ void main() {
     );
     await _tapText(tester, 'Kirim Pengajuan');
     expect(find.text('Pengajuan Terkirim'), findsOneWidget);
-    expect(state.rentals.first.status, RentalStatus.pending);
-    expect(state.rentals.first.activityName, 'Festival Tari');
+    expect(state.rental.rentals.first.status, RentalStatus.pending);
+    expect(state.rental.rentals.first.activityName, 'Festival Tari');
   });
 
   testWidgets('cek jadwal menampilkan slot setelah tanggal dipilih', (
     tester,
   ) async {
     final state = await signedInState();
-    state.startRental(facility: pendopo);
+    state.rental.startRental(facility: pendopo);
     final (date, _) = await firstAvailableBooking(state, pendopo);
-    state.selectRentalDate(date);
+    state.rental.selectDate(date);
     await _open(tester, state, AppRoutes.rentalSchedule);
 
     expect(find.text('Venue dipilih'), findsOneWidget);
@@ -165,7 +175,7 @@ void main() {
     await _tapText(tester, 'Kirim Pendaftaran');
     expect(find.text('Pilih salah satu kategori.'), findsOneWidget);
     expect(find.text('Persetujuan wajib dicentang.'), findsOneWidget);
-    expect(state.communityRegistrations, isEmpty);
+    expect(state.community.registrations, isEmpty);
   });
 
   testWidgets('filter galeri menampilkan kategori yang dipilih', (
@@ -182,12 +192,94 @@ void main() {
     expect(find.text('Gamelan Slendro Pelog'), findsOneWidget);
   });
 
+  testWidgets('Tanya Krida menjawab, menampilkan tombol, dan membuka layar', (
+    tester,
+  ) async {
+    final state = demoState();
+    await _open(tester, state, AppRoutes.assistant);
+    expect(find.text('Ada yang bisa Tanya Krida bantu?'), findsOneWidget);
+
+    await _tapText(tester, 'Berapa tarif sewa Pendopo Agung?');
+    expect(state.assistant.messages, hasLength(2));
+    expect(find.textContaining('Rp 2.500.000'), findsOneWidget);
+    expect(find.text('Berkas apa saja yang wajib?'), findsOneWidget);
+
+    await _tapText(tester, 'Sewa Pendopo Agung TKBJ');
+    expect(find.text('Sewa Fasilitas TKBJ'), findsWidgets);
+
+    // Kembali: percakapan tetap tersimpan, lalu bisa dimulai baru.
+    tester.state<NavigatorState>(find.byType(Navigator).first).pop();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Rp 2.500.000'), findsOneWidget);
+    await tester.tap(find.byTooltip('Percakapan baru'));
+    await tester.pumpAndSettle();
+    expect(state.assistant.messages, isEmpty);
+  });
+
+  testWidgets('Tanya Krida menjelaskan sejarah tari & membuka materinya', (
+    tester,
+  ) async {
+    final state = demoState();
+    await _open(tester, state, AppRoutes.assistant);
+
+    await _tapText(tester, 'Ceritakan sejarah Tari Topeng Malangan');
+    expect(find.textContaining('cerita Panji'), findsOneWidget);
+    await _tapText(tester, 'Baca materi Tari Topeng Malangan');
+    // Layar detail Edukasi Budaya untuk materi yang sama.
+    expect(find.text('Tari Topeng Malangan'), findsWidgets);
+    expect(find.text('Ada yang bisa Tanya Krida bantu?'), findsNothing);
+  });
+
+  testWidgets('Tanya Krida: pertanyaan diketik, gagal, lalu coba lagi', (
+    tester,
+  ) async {
+    final source = _FlakyAssistantDataSource();
+    final state = AppContainer.demo(source: source, pickFile: fakePick);
+    await _open(tester, state, AppRoutes.assistant);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('assistant-input')),
+      'Ada wayang kapan?',
+    );
+    await tester.pump();
+    await tester.tap(find.byTooltip('Kirim'));
+    await tester.pumpAndSettle();
+    expect(state.assistant.messages.map((m) => m.text), [
+      'Ada wayang kapan?',
+      'Server AI sedang sibuk.',
+    ]);
+    expect(find.text('Gagal mendapat jawaban'), findsOneWidget);
+    expect(find.text('Server AI sedang sibuk.'), findsOneWidget);
+
+    await _tapText(tester, 'Coba lagi');
+    expect(find.text('Gagal mendapat jawaban'), findsNothing);
+    // Pertanyaan dikirim ulang sekali saja, tanpa pesan gagal di riwayat.
+    expect(source.lastHistory.map((m) => m.text), ['Ada wayang kapan?']);
+    expect(state.assistant.messages.where((m) => m.isUser), hasLength(1));
+    expect(state.assistant.messages.last.isError, isFalse);
+  });
+
   testWidgets('tandai semua notifikasi sudah dibaca', (tester) async {
     final state = await signedInState();
     await _open(tester, state, AppRoutes.notifications);
     expect(find.text('2 baru'), findsOneWidget);
     await _tapText(tester, 'Tandai Semua Sudah Dibaca');
-    expect(state.unreadCount, 0);
+    expect(state.notification.unreadCount, 0);
     expect(find.text('2 baru'), findsNothing);
   });
+}
+
+/// Data source demo yang gagal pada pertanyaan pertama ke Tanya Krida.
+class _FlakyAssistantDataSource extends DemoDataSource {
+  int calls = 0;
+  List<AssistantMessage> lastHistory = const [];
+
+  @override
+  Future<AssistantMessage> askAssistant(List<AssistantMessage> history) {
+    lastHistory = List.of(history);
+    if (calls++ == 0) {
+      throw const ApiException(503, 'Server AI sedang sibuk.');
+    }
+    return super.askAssistant(history);
+  }
 }

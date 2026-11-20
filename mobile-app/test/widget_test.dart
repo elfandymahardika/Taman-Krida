@@ -3,17 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tkbj_mobile/app.dart';
 import 'package:tkbj_mobile/core/utils/formatters.dart';
 import 'package:tkbj_mobile/core/utils/validators.dart';
-import 'package:tkbj_mobile/data/dummy/dummy_data.dart';
-import 'package:tkbj_mobile/data/models/ticket_order.dart';
-import 'package:tkbj_mobile/state/app_state.dart';
+import 'package:tkbj_mobile/data/datasources/demo/seed/dummy_data.dart';
+import 'package:tkbj_mobile/domain/entities/ticket_order.dart';
+import 'package:tkbj_mobile/injection.dart';
+import 'package:tkbj_mobile/presentation/controllers/controllers.dart';
 
 import 'helpers/screen_harness.dart';
 
-Future<void> _pumpApp(WidgetTester tester, AppState state) async {
+Future<void> _pumpApp(WidgetTester tester, AppContainer state) async {
   tester.view.physicalSize = const Size(390, 844);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(TkbjApp(state: state));
+  await tester.pumpWidget(TkbjApp(container: state));
   await tester.pumpAndSettle();
 }
 
@@ -47,22 +48,25 @@ void main() {
     });
   });
 
-  group('AppState', () {
+  group('AppContainer', () {
     test('login gagal untuk kata sandi salah', () async {
       final state = demoState();
       await state.init();
       expect(
-        await state.login(DummyData.demoAccount.email, 'salah123'),
+        await state.auth.login(DummyData.demoAccount.email, 'salah123'),
         isNotNull,
       );
-      expect(state.isLoggedIn, isFalse);
+      expect(state.auth.isLoggedIn, isFalse);
       expect(
-        await state.login(DummyData.demoAccount.email, DummyData.demoPassword),
+        await state.auth.login(
+          DummyData.demoAccount.email,
+          DummyData.demoPassword,
+        ),
         isNull,
       );
-      expect(state.isLoggedIn, isTrue);
+      expect(state.auth.isLoggedIn, isTrue);
       expect(
-        state.orders,
+        state.ticket.orders,
         isNotEmpty,
         reason: 'data akun dimuat setelah login',
       );
@@ -72,19 +76,42 @@ void main() {
       final state = demoState();
       await state.init();
       final id = DummyData.events.first.id;
-      state.setQuantity(id, 9);
-      expect(state.quantityOf(id), AppState.maxTicketsPerEvent);
-      expect(state.cartTotal, 4 * DummyData.events.first.price);
-      state.setQuantity(id, -1);
-      expect(state.isCartEmpty, isTrue);
+      state.ticket.setQuantity(id, 9);
+      expect(state.ticket.quantityOf(id), TicketController.maxTicketsPerEvent);
+      expect(state.ticket.cartTotal, 4 * DummyData.events.first.price);
+      state.ticket.setQuantity(id, -1);
+      expect(state.ticket.isCartEmpty, isTrue);
     });
   });
 
-  testWidgets('beranda menampilkan hero dan fitur utama', (tester) async {
+  testWidgets('beranda menampilkan sapaan, pintasan, dan acara', (
+    tester,
+  ) async {
     await _pumpApp(tester, demoState());
     expect(find.text('Taman Krida Budaya Jawa Timur'), findsOneWidget);
-    expect(find.text('Lihat Kalender Acara'), findsOneWidget);
-    expect(find.text('Fitur Utama'), findsOneWidget);
+    expect(find.text('Lihat Acara'), findsOneWidget);
+    expect(find.text('Acara Mendatang'), findsOneWidget);
+    expect(find.byType(NavigationBar), findsOneWidget);
+  });
+
+  testWidgets('bottom navigation berpindah tab & tombol kembali ke Beranda', (
+    tester,
+  ) async {
+    await _pumpApp(tester, demoState());
+
+    await _tapText(tester, 'Acara');
+    expect(find.text('Kalender Acara Budaya'), findsOneWidget);
+
+    await _tapText(tester, 'Jelajah');
+    expect(find.text('Direktori Komunitas'), findsOneWidget);
+
+    await _tapText(tester, 'Akun');
+    expect(find.text('Anda belum masuk'), findsOneWidget);
+
+    // Tombol kembali sistem di tab lain → kembali ke Beranda.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Acara Mendatang'), findsOneWidget);
   });
 
   testWidgets('login menampilkan validasi lalu masuk ke Akun Saya', (
@@ -93,6 +120,7 @@ void main() {
     final state = demoState();
     await _pumpApp(tester, state);
 
+    await _tapText(tester, 'Akun');
     await _tapText(tester, 'Masuk');
     await _tapText(tester, 'Masuk ke Akun');
     expect(find.text('Alamat email wajib diisi.'), findsOneWidget);
@@ -111,7 +139,7 @@ void main() {
       DummyData.demoPassword,
     );
     await _tapText(tester, 'Masuk ke Akun');
-    expect(state.isLoggedIn, isTrue);
+    expect(state.auth.isLoggedIn, isTrue);
     expect(find.text('Akun Saya'), findsWidgets);
     expect(find.text(DummyData.demoAccount.name), findsOneWidget);
   });
@@ -155,21 +183,24 @@ void main() {
       find.text('Unggah bukti pembayaran terlebih dahulu.'),
       findsOneWidget,
     );
-    expect(state.orders.where((o) => o.buyer.name == 'Siti Rahma'), isEmpty);
+    expect(
+      state.ticket.orders.where((o) => o.buyer.name == 'Siti Rahma'),
+      isEmpty,
+    );
 
     await _tapText(tester, 'Unggah Bukti Pembayaran');
     await _tapText(tester, 'Pesan & Kirim Bukti Pembayaran →');
     expect(find.text('Bukti Pembayaran Terkirim'), findsOneWidget);
-    final order = state.orders.first;
+    final order = state.ticket.orders.first;
     expect(order.buyer.name, 'Siti Rahma');
     expect(order.status, PaymentStatus.verifying);
-    expect(state.isCartEmpty, isTrue);
+    expect(state.ticket.isCartEmpty, isTrue);
 
     // Admin Keuangan memverifikasi (disimulasikan pada mode demo).
     await _tapText(tester, 'Simulasi: Admin Verifikasi Lunas');
     expect(find.text('Pembayaran Berhasil!'), findsOneWidget);
     expect(find.text(order.bookingCode), findsOneWidget);
-    expect(state.findOrder(order.bookingCode)!.isPaid, isTrue);
+    expect(state.ticket.findOrder(order.bookingCode)!.isPaid, isTrue);
   });
 
   testWidgets('checkout tanpa login diarahkan ke halaman Masuk', (

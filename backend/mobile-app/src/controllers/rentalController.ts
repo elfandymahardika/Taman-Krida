@@ -93,22 +93,28 @@ export const getAvailability = async (req: Request, res: Response) => {
   const parsed = parseMonth(month);
   if (!parsed) throw badRequest('Format bulan tidak valid.', { month: 'Gunakan format YYYY-MM, mis. 2026-10.' });
 
-  const days = lastDay(parsed.y, parsed.m);
-  const busy = await busyAt(facility.name, `${month}-01`, `${month}-${days}`);
   res.json({
     facility: toFacility(facility),
     month,
     today: config.today,
     slots: RENTAL_SLOTS,
-    days: Array.from({ length: days }, (_, i) => {
-      const date = `${month}-${String(i + 1).padStart(2, '0')}`;
-      const slots = Object.fromEntries(
-        RENTAL_SLOTS.map((s) => [s.key, date < config.today ? 'past' : slotTaken(busy, date, s) ? 'full' : 'available']),
-      );
-      return { date, available: Object.values(slots).includes('available'), slots };
-    }),
+    days: await monthAvailability(facility.name, parsed.y, parsed.m),
   });
 };
+
+/** Status tiap slot per tanggal dalam satu bulan (past / full / available). Dipakai juga oleh Tanya Krida. */
+export async function monthAvailability(venue: string, y: number, m: number) {
+  const month = `${y}-${String(m).padStart(2, '0')}`;
+  const days = lastDay(y, m);
+  const busy = await busyAt(venue, `${month}-01`, `${month}-${days}`);
+  return Array.from({ length: days }, (_, i) => {
+    const date = `${month}-${String(i + 1).padStart(2, '0')}`;
+    const slots = Object.fromEntries(
+      RENTAL_SLOTS.map((s) => [s.key, date < config.today ? 'past' : slotTaken(busy, date, s) ? 'full' : 'available']),
+    ) as Record<Slot['key'], 'past' | 'full' | 'available'>;
+    return { date, available: Object.values(slots).includes('available'), slots };
+  });
+}
 
 /**
  * Ajukan sewa gedung (multipart): facilityId, date, slot, activity, applicant, contact + berkas ktp, surat, proposal.

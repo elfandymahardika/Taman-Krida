@@ -1,0 +1,16 @@
+# Jangan ikut terkirim ke Docker build context / image:
+# rahasia, dependency lokal (dipasang ulang oleh `npm ci` di dalam image), hasil build, unggahan, dan test.
+.env
+.env.*
+!.env.example
+node_modules
+dist
+uploads
+data
+test
+coverage
+*.log
+ngrok.yml
+Dockerfile
+.dockerignore
+.git

@@ -1,0 +1,156 @@
+# Susunan produksi TKBJ (jalankan dari folder deploy/):
+#
+#   Internet ──► nginx :80/:443  (reverse proxy + SSL/TLS, satu-satunya port yang dibuka)
+#                  ├─ /          ──► dashboard  (Next.js, panel admin)  ──► admin-api (Express, tidak dibuka ke luar)
+#                  └─ /mobile/   ──► mobile-api (Express, API aplikasi Flutter)
+#                                       admin-api & mobile-api ──► db (MariaDB, tidak dibuka ke luar)
+#
+#   cp .env.example .env              # isi password & rahasia
+#   docker compose up -d --build      # pertama kali (atau `docker compose pull` bila memakai image dari CI)
+#   docker compose run --rm migrate   # migration database (sekali per rilis)
+#   bash deploy.sh <tag-image>        # rilis berikutnya tanpa downtime (lihat README.md)
+#
+# Image yang sama dipakai di semua lingkungan; semua konfigurasi & rahasia masuk lewat environment saat runtime.
+
+name: tkbj
+
+x-app: &app
+  restart: unless-stopped
+  # tini sebagai PID 1: meneruskan SIGTERM ke Node.js dan membereskan proses zombie.
+  init: true
+  # Waktu bagi graceful shutdown sebelum Docker mengirim SIGKILL (> SHUTDOWN_TIMEOUT_MS aplikasi = 10 dtk).
+  stop_grace_period: 30s
+  networks: [internal]
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: '5' }
+
+x-db-env: &db-env
+  DB_HOST: db
+  DB_PORT: '3306'
+  DB_NAME: ${DB_NAME:-tkbj_admin}
+  DB_USER: ${DB_USER:-tkbj}
+  DB_PASSWORD: ${DB_PASSWORD:?Isi DB_PASSWORD di deploy/.env}
+
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-tkbj_admin}
+      MARIADB_USER: ${DB_USER:-tkbj}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Isi DB_PASSWORD di deploy/.env}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Isi DB_ROOT_PASSWORD di deploy/.env}
+    command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+    volumes: [db-data:/var/lib/mysql]
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [internal]
+
+  # Migration Prisma (prisma migrate deploy) memakai image API dashboard. Tidak ikut `up`:
+  #   docker compose run --rm migrate
+  migrate:
+    image: ${REGISTRY:-ghcr.io/elfandymahardika}/tkbj-admin-api:${IMAGE_TAG:-latest}
+    build: ../backend/admin-dashboard
+    command: ['node', 'dist/db/migrate.js']
+    environment:
+      <<: *db-env
+    depends_on:
+      db: { condition: service_healthy }
+    profiles: [tools]
+    networks: [internal]
+
+  # Data contoh (demo/staging saja — JANGAN di production berisi data asli):
+  #   docker compose run --rm seed
+  seed:
+    image: ${REGISTRY:-ghcr.io/elfandymahardika}/tkbj-admin-api:${IMAGE_TAG:-latest}
+    command: ['node', 'dist/db/seeders/run.js']
+    environment:
+      <<: *db-env
+    depends_on:
+      db: { condition: service_healthy }
+    profiles: [tools]
+    networks: [internal]
+
+  admin-api:
+    <<: *app
+    image: ${REGISTRY:-ghcr.io/elfandymahardika}/tkbj-admin-api:${IMAGE_TAG:-latest}
+    build: ../backend/admin-dashboard
+    environment:
+      <<: *db-env
+      JWT_SECRET: ${ADMIN_JWT_SECRET:?Isi ADMIN_JWT_SECRET di deploy/.env}
+      FRONTEND_URL: ${PUBLIC_URL:?Isi PUBLIC_URL di deploy/.env}
+      # Satu hop proxy di depan API ini (server Next.js) → app.set('trust proxy', 1).
+      TRUST_PROXY: '1'
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN:-}
+      BLOB_ACCESS: ${BLOB_ACCESS:-private}
+    volumes:
+      - admin-uploads:/app/uploads
+      # Lampiran dari aplikasi mobile (bila tanpa Vercel Blob) agar admin bisa membukanya.
+      - mobile-uploads:/data/mobile-uploads
+    depends_on:
+      db: { condition: service_healthy }
+
+  mobile-api:
+    <<: *app
+    image: ${REGISTRY:-ghcr.io/elfandymahardika}/tkbj-mobile-api:${IMAGE_TAG:-latest}
+    build: ../backend/mobile-app
+    environment:
+      <<: *db-env
+      JWT_SECRET: ${MOBILE_JWT_SECRET:?Isi MOBILE_JWT_SECRET di deploy/.env}
+      CORS_ORIGINS: ${MOBILE_CORS_ORIGINS:-}
+      # Satu hop proxy di depan API ini (Nginx) → app.set('trust proxy', 1).
+      TRUST_PROXY: '1'
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      ADMIN_PUBLIC_URL: ${PUBLIC_URL:?Isi PUBLIC_URL di deploy/.env}
+      BLOB_READ_WRITE_TOKEN: ${BLOB_READ_WRITE_TOKEN:-}
+      BLOB_ACCESS: ${BLOB_ACCESS:-private}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+    volumes:
+      - mobile-uploads:/app/uploads
+    depends_on:
+      db: { condition: service_healthy }
+
+  dashboard:
+    <<: *app
+    image: ${REGISTRY:-ghcr.io/elfandymahardika}/tkbj-dashboard:${IMAGE_TAG:-latest}
+    build: ../frontend/admin-dashboard
+    environment:
+      # Dibaca saat runtime (bukan NEXT_PUBLIC_*), jadi image tidak perlu di-build ulang per lingkungan.
+      API_URL: http://admin-api:5000/api
+    depends_on:
+      admin-api: { condition: service_healthy }
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      # Sertifikat TLS (mis. dari certbot). Lihat nginx/tls.conf.example.
+      - ${TLS_CERT_DIR:-./nginx/certs}:/etc/nginx/certs:ro
+    depends_on:
+      dashboard: { condition: service_healthy }
+      mobile-api: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD', 'wget', '-qO', '/dev/null', 'http://127.0.0.1/nginx-health']
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks: [internal]
+
+networks:
+  internal:
+
+volumes:
+  db-data:
+  admin-uploads:
+  mobile-uploads:

@@ -1,16 +1,16 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tkbj_mobile/app.dart';
-import 'package:tkbj_mobile/data/dummy/dummy_data.dart';
-import 'package:tkbj_mobile/data/models/facility.dart';
-import 'package:tkbj_mobile/data/models/rental_request.dart';
-import 'package:tkbj_mobile/data/models/ticket_order.dart';
-import 'package:tkbj_mobile/data/repository/demo_repository.dart';
-import 'package:tkbj_mobile/routes/app_routes.dart';
-import 'package:tkbj_mobile/state/app_state.dart';
+import 'package:tkbj_mobile/data/datasources/demo/seed/dummy_data.dart';
+import 'package:tkbj_mobile/domain/entities/facility.dart';
+import 'package:tkbj_mobile/domain/entities/rental_request.dart';
+import 'package:tkbj_mobile/domain/entities/ticket_order.dart';
+import 'package:tkbj_mobile/injection.dart';
+import 'package:tkbj_mobile/presentation/routes/app_routes.dart';
 
 /// Satu layar yang akan dirender pada pengujian tampilan.
 class ScreenCase {
@@ -27,14 +27,14 @@ class ScreenCase {
   final String route;
   final Object? arguments;
 
-  /// `false` untuk layar yang tampil sebelum login (navbar "Masuk").
+  /// `false` untuk layar yang tampil sebelum login (tamu).
   final bool signedIn;
 
   /// Tinggi frame pada desain Figma (untuk screenshot satu halaman penuh).
   final double height;
 
   /// Menyiapkan state tambahan sebelum layar dibuka.
-  final Future<void> Function(AppState state)? prepare;
+  final Future<void> Function(AppContainer state)? prepare;
 }
 
 /// Berkas PDF kecil pengganti pemilih berkas sistem.
@@ -46,24 +46,24 @@ UploadedFile fakeFile([String name = 'berkas.pdf']) => UploadedFile.fromBytes(
 Future<UploadedFile?> fakePick({required bool imagesOnly}) async =>
     fakeFile(imagesOnly ? 'bukti.jpg' : 'berkas.pdf');
 
-/// State dengan data contoh di memori (tanpa server) & pemilih berkas palsu.
-AppState demoState() =>
-    AppState(repository: DemoRepository(), pickFile: fakePick);
+/// Aplikasi mode demo: data contoh di memori (tanpa server) & pemilih
+/// berkas palsu.
+AppContainer demoState() => AppContainer.demo(pickFile: fakePick);
 
-/// [AppState] yang sudah memuat data contoh dan masuk sebagai akun demo.
-Future<AppState> signedInState() async {
+/// [AppContainer] yang sudah memuat data contoh dan masuk sebagai akun demo.
+Future<AppContainer> signedInState() async {
   final state = demoState();
   await state.init();
-  await state.login(DummyData.demoAccount.email, DummyData.demoPassword);
+  await state.auth.login(DummyData.demoAccount.email, DummyData.demoPassword);
   return state;
 }
 
 /// State berisi akun login, keranjang, dan data pemesan agar semua layar
 /// (termasuk checkout & akun) bisa dirender langsung.
-Future<AppState> seededState({bool signedIn = true}) async {
+Future<AppContainer> seededState({bool signedIn = true}) async {
   final state = signedIn ? await signedInState() : demoState();
   await state.init();
-  state
+  state.ticket
     ..setQuantity(DummyData.events[0].id, 2)
     ..setQuantity(DummyData.events[1].id, 1)
     ..saveBuyer(
@@ -81,53 +81,53 @@ Facility get pendopo => DummyData.facilities.first;
 /// Tanggal & slot pertama yang masih tersedia untuk [facility], dimulai
 /// beberapa hari setelah "hari ini" data contoh.
 Future<(DateTime, RentalSlot)> firstAvailableBooking(
-  AppState state,
+  AppContainer state,
   Facility facility,
 ) async {
-  var date = state.today.add(const Duration(days: 3));
-  await state.loadAvailability(facility, date);
-  while (state.isDateFull(facility, date)) {
+  var date = state.catalog.today.add(const Duration(days: 3));
+  await state.rental.loadAvailability(facility, date);
+  while (state.rental.isDateFull(facility, date)) {
     date = date.add(const Duration(days: 1));
-    await state.loadAvailability(facility, date);
+    await state.rental.loadAvailability(facility, date);
   }
   final slot = RentalSlot.values.firstWhere(
-    (s) => !state.isSlotTaken(facility, date, s),
+    (s) => !state.rental.isSlotTaken(facility, date, s),
   );
   return (date, slot);
 }
 
-Future<void> _draftVenue(AppState state) async =>
-    state.startRental(facility: pendopo);
+Future<void> _draftVenue(AppContainer state) async =>
+    state.rental.startRental(facility: pendopo);
 
-Future<void> _draftSchedule(AppState state) async {
+Future<void> _draftSchedule(AppContainer state) async {
   await _draftVenue(state);
   final (date, slot) = await firstAvailableBooking(state, pendopo);
-  state
-    ..selectRentalDate(date)
-    ..selectRentalSlot(slot);
+  state.rental
+    ..selectDate(date)
+    ..selectSlot(slot);
 }
 
-Future<void> _draftForm(AppState state) async {
+Future<void> _draftForm(AppContainer state) async {
   await _draftSchedule(state);
-  state.saveRentalForm(
+  state.rental.saveForm(
     activityName: 'Festival Tari Topeng Malangan 2026',
     applicantName: 'Yayasan Mekar Sari Malang',
     contact: '0812-3456-7890',
   );
 }
 
-Future<void> _draftDocuments(AppState state) async {
+Future<void> _draftDocuments(AppContainer state) async {
   await _draftForm(state);
-  state
-    ..attachRentalDocument('ktp', fakeFile('ktp.pdf'))
-    ..attachRentalDocument('surat', fakeFile('surat-permohonan.pdf'));
+  state.rental
+    ..attachDocument('ktp', fakeFile('ktp.pdf'))
+    ..attachDocument('surat', fakeFile('surat-permohonan.pdf'));
 }
 
-Future<void> _approvePending(AppState state) =>
-    state.simulateAdmin((demo) => demo.approveRental('SG-1026-0020'));
+Future<void> _approvePending(AppContainer state) =>
+    state.admin.approveRental('SG-1026-0020');
 
 const screenCases = [
-  ScreenCase('01-beranda', AppRoutes.home, height: 1820, signedIn: false),
+  ScreenCase('01-beranda', AppRoutes.home, height: 1060, signedIn: false),
   ScreenCase('02-menu-navigasi', AppRoutes.menu, height: 960, signedIn: false),
   ScreenCase('03-masuk', AppRoutes.login, height: 844, signedIn: false),
   ScreenCase(
@@ -246,20 +246,39 @@ const screenCases = [
   ScreenCase('32-riwayat-sewa', AppRoutes.rentalHistory, height: 1040),
   ScreenCase('33-edit-profil', AppRoutes.editProfile, height: 1000),
   ScreenCase('34-notifikasi', AppRoutes.notifications, height: 1160),
+  ScreenCase(
+    '35-tanya-krida',
+    AppRoutes.assistant,
+    height: 844,
+    signedIn: false,
+  ),
+  ScreenCase(
+    '36-tanya-krida-jawaban',
+    AppRoutes.assistant,
+    height: 844,
+    signedIn: false,
+    // Tidak ditunggu: jawaban demo datang setelah jeda, saat layar sudah
+    // dirender dan waktu test dimajukan oleh pumpAndSettle.
+    prepare: _askCultureHistory,
+  ),
 ];
 
-/// Merender [screen] di atas beranda pada ukuran [size].
+Future<void> _askCultureHistory(AppContainer state) async {
+  unawaited(state.assistant.ask('Ceritakan sejarah Tari Topeng Malangan'));
+}
+
+/// Merender [screen] di atas beranda (tab pertama) pada ukuran [size].
 Future<void> pumpScreen(
   WidgetTester tester,
   ScreenCase screen,
   Size size, {
-  AppState? state,
+  AppContainer? state,
 }) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   final appState = state ?? await seededState(signedIn: screen.signedIn);
   await screen.prepare?.call(appState);
-  await tester.pumpWidget(TkbjApp(state: appState));
+  await tester.pumpWidget(TkbjApp(container: appState));
   await tester.pumpAndSettle();
   if (screen.route != AppRoutes.home) {
     tester

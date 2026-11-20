@@ -1,5 +1,6 @@
 import express, { Router } from 'express';
 import { config } from '../config/env';
+import { healthCheck } from '../lib/health';
 import * as communities from '../controllers/communityController';
 import * as contents from '../controllers/contentController';
 import * as dashboard from '../controllers/dashboardController';
@@ -32,9 +33,8 @@ const router = Router();
 // ==========================================
 // RUTE PUBLIK
 // ==========================================
-router.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'tkbj-admin-api', today: config.today });
-});
+// Sama dengan GET /health (app.ts), tetapi lewat pembatas /api; dipakai klien untuk cek koneksi.
+router.get('/health', healthCheck);
 
 // Autentikasi (register, login, logout, me) ada di routes/authRoutes.ts, dipasang di /api/auth oleh app.ts.
 
@@ -65,6 +65,7 @@ router.delete('/events/:id', eventsEdit, events.removeEvent);
 // Transaksi (daftar pesanan tiket juga boleh dibaca peran Acara, dicek di controller)
 const paymentsEdit = [requireView('payments'), requireAccess('payments')];
 router.get('/orders', orders.getOrders);
+router.get('/orders/stats', requireView('payments'), orders.getOrderStats);
 router.get('/orders/export.csv', requireView('payments'), orders.exportOrdersCsv);
 router.get('/orders/:id', requireView('payments'), orders.getOrder);
 router.get('/orders/:id/proof', requireView('payments'), visitorFiles.getOrderProof);

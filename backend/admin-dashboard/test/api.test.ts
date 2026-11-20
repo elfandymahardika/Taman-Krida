@@ -4,15 +4,18 @@ import { AddressInfo } from 'node:net';
 import { Server } from 'node:http';
 import { after, before, describe, test } from 'node:test';
 import express from 'express';
+import pino from 'pino';
 import app from '../src/app';
 import pool from '../src/config/db';
 import { config } from '../src/config/env';
 import prisma from '../src/lib/prisma';
 import { recreateTestDatabase } from '../src/db/migrate';
+import { loggerOptions } from '../src/logger';
 import { runSeeders } from '../src/db/seeders/run';
 import { authMiddleware } from '../src/middleware/authMiddleware';
 import { errorHandler } from '../src/middleware/errorHandler';
 import { rateLimit } from '../src/middleware/rateLimiter';
+import { createRequestLogger } from '../src/middleware/requestLogger';
 import { requireRole } from '../src/middleware/requireRole';
 
 let server: Server;
@@ -628,5 +631,176 @@ describe('CHECK POINT 11: middleware auth, peran, dan pembatas', () => {
     const migrations = await prisma.$queryRaw<{ migration_name: string }[]>`SELECT migration_name FROM _prisma_migrations ORDER BY migration_name`
     assert.deepEqual(migrations.map((m) => m.migration_name), ['0_init', '1_blob_file_urls'])
     assert.equal(await prisma.user.count(), (await call('/users', { token: await login('admin', 'admin123') })).body.length)
+  })
+})
+
+describe('CHECK POINT 11 bagian 5: keamanan, error & logging', () => {
+  /** Permintaan ke API utama dengan Response lengkap (header ikut diperiksa). */
+  const send = (path: string, init: RequestInit = {}) => fetch(base + path, init)
+  const json = { 'content-type': 'application/json' }
+
+  /** Server Express kecil dengan logger permintaan yang menulis ke memori, untuk memeriksa isi log. */
+  const loggedApp = async (setup: (a: express.Express) => void) => {
+    const lines: any[] = []
+    const memoryLogger = pino({ ...loggerOptions, level: 'info' }, { write: (line: string) => lines.push(JSON.parse(line)) })
+    const a = express()
+    a.use(createRequestLogger(memoryLogger))
+    setup(a)
+    a.use(errorHandler)
+    const s = a.listen(0)
+    await new Promise((r) => s.once('listening', r))
+    after(() => s.close())
+    return { url: `http://localhost:${(s.address() as AddressInfo).port}`, lines, memoryLogger }
+  }
+
+  test('Helmet memasang header keamanan dan X-Powered-By disembunyikan', async () => {
+    const res = await send('/auth/me')
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff')
+    assert.ok(res.headers.get('x-frame-options'))
+    assert.ok(res.headers.get('content-security-policy'))
+    assert.equal(res.headers.get('x-powered-by'), null)
+  })
+
+  test('input salah → 400 yang jelas (bukan 500), lengkap dengan requestId', async () => {
+    const headers = { ...json, 'x-forwarded-for': '198.51.100.1' }
+    const bad = await send('/auth/login', { method: 'POST', headers, body: JSON.stringify({ username: '', password: '' }) })
+    assert.equal(bad.status, 400)
+    const body = await bad.json()
+    assert.ok(body.fields.username && body.fields.password)
+    assert.equal(body.requestId, bad.headers.get('x-request-id'))
+
+    const broken = await send('/auth/login', { method: 'POST', headers, body: '{rusak' })
+    assert.equal(broken.status, 400)
+    assert.equal((await broken.json()).error, 'Format JSON tidak valid.')
+  })
+
+  test('belum login 401, tidak berhak 403, data tidak ada 404, rute tidak dikenal 404', async () => {
+    assert.equal((await call('/events')).status, 401)
+    assert.equal((await call('/users', { token: await login('keuangan', 'keuangan123') })).status, 403)
+    const admin = await login('admin', 'admin123')
+    const missing = await call('/events/999999', { token: admin })
+    assert.equal(missing.status, 404)
+    assert.match(missing.body.error, /tidak ditemukan/)
+    const unknown = await call('/rute-yang-tidak-ada', { token: admin })
+    assert.equal(unknown.status, 404)
+    assert.equal(unknown.body.error, 'Endpoint tidak ditemukan.')
+  })
+
+  test('error tak terduga di handler async → 500 umum tanpa stack trace; detail hanya di log', async () => {
+    const { url, lines } = await loggedApp((a) =>
+      a.get('/meledak', async () => {
+        await Promise.resolve()
+        throw new Error('Koneksi DB gagal: password=rahasia123')
+      }),
+    )
+    const res = await fetch(`${url}/meledak?token=abc`, { headers: { authorization: 'Bearer token-rahasia', 'x-request-id': 'uji-500-abc' } })
+    assert.equal(res.status, 500)
+    const text = await res.text()
+    assert.deepEqual(JSON.parse(text), { error: 'Terjadi kesalahan pada server.', requestId: 'uji-500-abc' })
+    assert.doesNotMatch(text, /rahasia|stack|\.ts/)
+
+    await new Promise((r) => setImmediate(r))
+    const entry = lines.find((l) => l.requestId === 'uji-500-abc')
+    assert.ok(entry, 'baris log permintaan memakai request ID yang sama')
+    assert.equal(entry.level, 50)
+    assert.deepEqual(entry.req, { method: 'GET', path: '/meledak' })
+    assert.equal(entry.res.statusCode, 500)
+    assert.equal(typeof entry.responseTime, 'number')
+    assert.match(entry.err.stack, /Koneksi DB gagal/)
+    // Header Authorization dan query string tidak ikut tercatat.
+    assert.doesNotMatch(JSON.stringify(lines), /token-rahasia|token=abc/)
+  })
+
+  test('log menyensor password, token, dan header Authorization', async () => {
+    const { lines, memoryLogger } = await loggedApp(() => {})
+    memoryLogger.info({ body: { password: 'Rahasia123', token: 'abc' }, headers: { authorization: 'Bearer xyz' } }, 'uji sensor')
+    const entry = lines.find((l) => l.msg === 'uji sensor')
+    assert.equal(entry.body.password, '[disensor]')
+    assert.equal(entry.body.token, '[disensor]')
+    assert.equal(entry.headers.authorization, '[disensor]')
+  })
+
+  test('request ID dibuat baru bila tidak ada/tidak valid, dipakai ulang bila valid', async () => {
+    const fresh = await send('/auth/me')
+    assert.match(fresh.headers.get('x-request-id') ?? '', /^[0-9a-f-]{36}$/)
+    const reused = await send('/auth/me', { headers: { 'x-request-id': 'dari-proxy-123' } })
+    assert.equal(reused.headers.get('x-request-id'), 'dari-proxy-123')
+    assert.equal((await reused.json()).requestId, 'dari-proxy-123')
+    const invalid = await send('/auth/me', { headers: { 'x-request-id': '<script> alert(1)' } })
+    assert.match(invalid.headers.get('x-request-id') ?? '', /^[0-9a-f-]{36}$/)
+  })
+
+  test('rate limit umum di /api; batas login dihitung per IP pengguna di balik proxy (429)', async () => {
+    assert.equal((await send('/auth/me')).headers.get('ratelimit-limit'), String(config.rateLimit.max))
+
+    const loginFrom = (ip: string) =>
+      send('/auth/login', { method: 'POST', headers: { ...json, 'x-forwarded-for': ip }, body: JSON.stringify({ username: 'uji', password: '1' }) })
+    for (let i = 0; i < 20; i++) assert.equal((await loginFrom('203.0.113.10')).status, 400)
+    const blocked = await loginFrom('203.0.113.10')
+    assert.equal(blocked.status, 429)
+    assert.ok(Number(blocked.headers.get('retry-after')) > 0)
+    // Pengguna lain (IP berbeda) di balik proxy yang sama tidak ikut terblokir.
+    assert.equal((await loginFrom('203.0.113.11')).status, 400)
+  })
+})
+
+describe('performa: paginasi server & ringkasan transaksi', () => {
+  test('GET /orders?page=&limit= memotong data di database dan mengembalikan info halaman', async () => {
+    const token = await login('admin', 'admin123')
+    const total = (await queryOne('SELECT COUNT(*) AS n FROM orders', [])).n
+    const first = await call('/orders?page=1&limit=3', { token })
+    assert.equal(first.status, 200)
+    assert.equal(first.body.data.length, Math.min(3, total))
+    assert.deepEqual(first.body.pagination, { page: 1, limit: 3, total, totalPages: Math.ceil(total / 3) })
+    const second = await call('/orders?page=2&limit=3', { token })
+    assert.ok(second.body.data.every((o) => !first.body.data.some((p) => p.id === o.id)), 'halaman 2 tidak mengulang baris halaman 1')
+
+    // limit dibatasi maks. 100; nilai tidak valid kembali ke bawaan (halaman 1, 10 baris).
+    assert.equal((await call('/orders?page=1&limit=100000', { token })).body.pagination.limit, 100)
+    assert.deepEqual((await call('/orders?page=abc&limit=-5', { token })).body.pagination.page, 1)
+    assert.equal((await call('/orders?page=abc&limit=-5', { token })).body.pagination.limit, 10)
+    // Tanpa ?page → array biasa seperti sebelumnya (widget Beranda).
+    assert.ok(Array.isArray((await call('/orders?limit=5', { token })).body))
+  })
+
+  test('filter ikut dihitung di total; status tiket & metode bayar', async () => {
+    const token = await login('admin', 'admin123')
+    const lunas = (await queryOne("SELECT COUNT(*) AS n FROM orders WHERE type = 'Tiket' AND payment = 'Lunas'", [])).n
+    const aktif = await call('/orders?page=1&limit=100&type=Tiket&ticket=aktif', { token })
+    assert.equal(aktif.body.pagination.total, lunas)
+    assert.ok(aktif.body.data.every((o) => o.ticket.status === 'Tiket aktif'))
+    const belum = await call('/orders?page=1&limit=100&type=Tiket&ticket=belum', { token })
+    assert.ok(belum.body.data.every((o) => o.ticket.status === 'Belum terbit'))
+
+    const transfer = await call('/orders?page=1&limit=100&method=Transfer', { token })
+    assert.ok(transfer.body.data.every((o) => o.method?.startsWith('Transfer')))
+    // Karakter wildcard LIKE dari pengguna tidak dianggap pola.
+    assert.equal((await call('/orders?page=1&method=%25', { token })).body.pagination.total, 0)
+  })
+
+  test('GET /orders/stats dihitung dari seluruh data, hanya untuk modul Transaksi', async () => {
+    const token = await login('admin', 'admin123')
+    const stats = (await call('/orders/stats', { token })).body
+    const waiting = (await queryOne("SELECT COUNT(*) AS n FROM orders WHERE payment = 'Menunggu bayar'", [])).n
+    const verify = (await queryOne("SELECT COUNT(*) AS n FROM orders WHERE payment = 'Perlu verifikasi'", [])).n
+    assert.equal(stats.waiting, waiting)
+    assert.equal(stats.verify, verify)
+    assert.equal(stats.month.key, config.today.slice(0, 7))
+    const konten = await login('siti.rahma', 'tkbj2026') // tanpa akses Transaksi
+    assert.equal((await call('/orders/stats', { token: konten })).status, 403)
+  })
+})
+
+describe('produksi: health check', () => {
+  test('GET /health (tanpa /api) mengecek koneksi MySQL', async () => {
+    const res = await fetch(base.replace(/\/api$/, '/health'))
+    assert.equal(res.status, 200)
+    assert.equal(res.headers.get('cache-control'), 'no-store')
+    const body = await res.json()
+    assert.equal(body.ok, true)
+    assert.equal(body.database, 'up')
+    assert.equal(typeof body.dbLatencyMs, 'number')
+    // /api/health memakai handler yang sama.
+    assert.equal((await call('/health')).body.database, 'up')
   })
 })

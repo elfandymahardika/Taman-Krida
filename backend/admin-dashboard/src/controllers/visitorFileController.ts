@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { pipeline } from 'stream/promises';
 import type { VisitorFile } from '@prisma/client';
 import { notFound } from '../lib/http';
 import { findOrderById } from '../models/orderModel';
@@ -20,7 +21,8 @@ async function sendFile(res: Response, file: VisitorFile | null, what: string) {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(file.name)}`);
   res.type(file.mime);
-  stream.pipe(res);
+  // pipeline: error saat mengalirkan berkas (mis. koneksi storage putus) diteruskan ke error handler, tidak membuat proses crash.
+  await pipeline(stream, res);
 }
 
 /** GET /api/orders/:id/proof — bukti bayar terbaru yang diunggah pemesan lewat aplikasi. */

@@ -1,34 +1,44 @@
 import 'package:flutter/material.dart';
 
 import 'core/theme/app_theme.dart';
-import 'routes/app_routes.dart';
-import 'state/app_state.dart';
+import 'injection.dart';
+import 'presentation/routes/app_routes.dart';
+import 'presentation/controllers/controllers.dart';
+import 'presentation/pages/shell/main_shell.dart';
 
 class TkbjApp extends StatefulWidget {
-  const TkbjApp({super.key, this.state});
+  const TkbjApp({super.key, this.container});
 
-  /// Bisa diisi dari test agar state dapat diperiksa.
-  final AppState? state;
+  /// Bisa diisi dari test (mode demo / Controller yang sudah disiapkan).
+  final AppContainer? container;
 
   @override
   State<TkbjApp> createState() => _TkbjAppState();
 }
 
 class _TkbjAppState extends State<TkbjApp> {
-  late final AppState _state = widget.state ?? AppState();
-  late final AppRouter _router = AppRouter(_state);
+  late final AppContainer _app =
+      widget.container ?? AppContainer.fromEnvironment();
+  late final AppRouter _router = AppRouter(_app.auth);
+  final _tab = ValueNotifier(ShellTab.home);
 
   @override
   void initState() {
     super.initState();
     // Muat data dari server (atau data contoh) & pulihkan sesi login.
-    _state.init();
+    _app.init();
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AppStateScope(
-      state: _state,
+    Widget child = ShellScope(
+      controller: _tab,
       child: MaterialApp(
         title: 'TKBJ Mobile',
         debugShowCheckedModeBanner: false,
@@ -37,5 +47,16 @@ class _TkbjAppState extends State<TkbjApp> {
         onGenerateRoute: _router.onGenerateRoute,
       ),
     );
+    // Setiap Controller tersedia untuk semua Page di bawahnya.
+    child = ControllerProvider(controller: _app.upload, child: child);
+    child = ControllerProvider(controller: _app.education, child: child);
+    child = ControllerProvider(controller: _app.admin, child: child);
+    child = ControllerProvider(controller: _app.assistant, child: child);
+    child = ControllerProvider(controller: _app.notification, child: child);
+    child = ControllerProvider(controller: _app.community, child: child);
+    child = ControllerProvider(controller: _app.rental, child: child);
+    child = ControllerProvider(controller: _app.ticket, child: child);
+    child = ControllerProvider(controller: _app.auth, child: child);
+    return ControllerProvider(controller: _app.catalog, child: child);
   }
 }

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 48 48" fill="none">
+  <title>Logo Taman Krida Budaya Jawa Timur</title>
+  <!-- Lingkaran merek -->
+  <circle cx="24" cy="24" r="24" fill="#7A2E2E"/>
+  <circle cx="24" cy="24" r="21" stroke="#C9A227" stroke-width="1.1" opacity="0.75"/>
+  <!-- Gunungan (kayon) wayang -->
+  <path d="M24 8.5C29.6 13.6 34 20.6 33.6 28.4V34H14.4V28.4C14 20.6 18.4 13.6 24 8.5Z" fill="#C9A227"/>
+  <!-- Pohon hayat -->
+  <path d="M24 13.5V29.5M24 18.5L20.8 16M24 18.5L27.2 16M24 22.8L19.4 19.8M24 22.8L28.6 19.8M24 27L18.4 24.2M24 27L29.6 24.2"
+        stroke="#7A2E2E" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Gapura -->
+  <path d="M21 34V31.2C21 29.5 22.3 28.4 24 28.4C25.7 28.4 27 29.5 27 31.2V34H21Z" fill="#7A2E2E"/>
+  <!-- Alas -->
+  <rect x="12" y="34" width="24" height="2.8" rx="1.2" fill="#C9A227"/>
+</svg>

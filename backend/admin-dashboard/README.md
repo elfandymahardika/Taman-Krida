@@ -52,14 +52,17 @@ Saat server jalan, terminal menampilkan `✓ Database MySQL Connection Pool berh
 | `DB_NAME` | `tkbj_admin` | Nama database (dibuat otomatis oleh `npm run migrate`) |
 | `DB_USER` · `DB_PASSWORD` | `root` · kosong | Kredensial MySQL (bawaan XAMPP) |
 | `JWT_SECRET` | rahasia dev | **Wajib** diganti; wajib diisi bila `NODE_ENV=production` |
-| `FRONTEND_URL` | `http://localhost:3000` | Origin frontend yang diizinkan CORS, pisahkan dengan koma (mis. tambah origin frontend rekan tim) |
+| `FRONTEND_URL` | `http://localhost:3000` | Origin frontend yang diizinkan CORS, pisahkan dengan koma (mis. tambah origin frontend rekan tim). Wajib diisi (bukan `*`) bila `NODE_ENV=production` |
+| `TRUST_PROXY` | `loopback` | Setelan Express `trust proxy`: `X-Forwarded-For` hanya dipercaya dari mesin yang sama (proxy Next.js, agen Ngrok). `false` = tanpa proxy, angka = jumlah hop di hosting |
+| `RATE_LIMIT_MAX` · `RATE_LIMIT_WINDOW_MIN` | `1000` · `15` | Batas umum semua rute `/api` per IP (lebih → 429) |
+| `LOG_LEVEL` | `info` | Level log pino (`silent` saat test) |
 | `UPLOADS_DIR` | `uploads` | Folder berkas galeri & dokumen bila tanpa Vercel Blob (disajikan di `/uploads/…`) |
 | `BLOB_READ_WRITE_TOKEN` | kosong | Token Vercel Blob: galeri & dokumen staf disimpan di cloud. Pakai token yang sama di backend mobile agar lampiran dari aplikasi bisa dibuka |
-| `BLOB_ACCESS` | `private` | Akses lampiran dari aplikasi di Vercel Blob (`private` / `public`) |
+| `BLOB_ACCESS` | `private` | Akses store Vercel Blob (`private` / `public`), samakan dengan setelan store. Private: galeri & dokumen dialirkan backend di `/uploads/<folder>/<nama>` |
 | `MOBILE_UPLOADS_DIR` | `../mobile-app/uploads` | Folder lampiran dari aplikasi bila tanpa Vercel Blob (sama dengan `UPLOADS_DIR` backend mobile) |
 | `DATABASE_URL` | disusun dari `DB_*` | Opsional; isi hanya bila memakai URL MySQL lain (mis. hosting) |
 | `UPLOAD_LIMIT_MB` | `25` | Ukuran maksimal satu berkas unggahan |
-| `APP_TODAY` | `2026-10-02` | "Hari ini" pada data contoh (agenda & periode bawaan) |
+| `APP_TODAY` | _(kosong = tanggal sebenarnya, WIB)_ | Kunci "hari ini" ke tanggal tertentu, mis. `2026-10-02` untuk demo data contoh |
 
 Masa berlaku token login diatur dari halaman **Pengaturan → Keamanan → Durasi sesi**, bukan dari `.env`. File `.env` tidak di-commit (sudah ada di `.gitignore`).
 
@@ -150,13 +153,33 @@ Hak akses per modul (didefinisikan di `src/lib/roles.ts`, ditampilkan sebagai ma
 
 Undangan staf dari admin berstatus *Undangan* dan belum bisa masuk (alur aktivasi belum dibuat).
 
+## Keamanan, error & logging
+
+Urutan middleware di `src/app.ts`: **request logger → Helmet → CORS → rate limiter → parser body → routes → 404 → error handler**.
+
+| Bagian | File | Perilaku |
+| --- | --- | --- |
+| Header keamanan | `src/app.ts` (`helmet`) | `X-Content-Type-Options`, `X-Frame-Options`, CSP, HSTS, dll.; `X-Powered-By` dimatikan. CORP `cross-origin` agar foto galeri bisa dimuat aplikasi mobile |
+| Proxy | `src/app.ts`, `config/env.ts` | `trust proxy` dari `TRUST_PROXY`; proxy Next.js meneruskan IP pengguna sehingga rate limit dihitung per pengguna, bukan per server Next.js |
+| CORS | `src/app.ts` | Hanya origin di `FRONTEND_URL`; server menolak start di production bila belum diisi |
+| Rate limit | `src/middleware/rateLimiter.ts` | Umum `/api` (1000/15 menit per IP), login (20 gagal/15 menit per IP + kunci akun), registrasi (10/jam). Lewat batas → **429** + `Retry-After`. Penghitung di memori: untuk beberapa instance pindahkan ke store bersama (Redis/DB) |
+| Auth & peran | `authMiddleware.ts`, `requireRole.ts` | Belum login / token dicabut → **401**, peran tidak berhak → **403** |
+| Validasi | `middleware/validator.ts`, `lib/validate.ts` | Input salah → **400** + pesan per kolom, tidak pernah diteruskan sebagai 500 |
+| Error bertipe | `src/lib/http.ts` (`HttpError`, `badRequest`, `notFound`, `conflict`) | Kondisi yang diharapkan dilempar dengan status HTTP-nya |
+| 404 & error handler | `src/middleware/errorHandler.ts` | Rute tak dikenal → **404**. Error tak terduga → **500** dengan pesan umum, stack hanya di log. Respons yang sudah mulai terkirim diserahkan ke Express (koneksi ditutup) |
+| Logging | `src/logger.ts`, `src/middleware/requestLogger.ts` | pino + pino-http: satu baris per permintaan (`requestId`, method, path tanpa query, status, `responseTime`). Header, body, dan query tidak dicatat; password/token/cookie disensor |
+| Request ID | `requestLogger.ts` | Header `X-Request-Id` (dipakai ulang bila valid, selain itu UUID baru), ikut di respons error (`requestId`) dan di setiap baris log |
+| Async | Express 5 | Promise yang ditolak di controller async otomatis diteruskan ke error handler; stream berkas memakai `pipeline` |
+
+Contoh respons error: `{ "error": "Terjadi kesalahan pada server.", "requestId": "3f2a…" }` — cari `requestId` itu di log server untuk melihat detailnya.
+
 ## Endpoint
 
-Semua endpoint selain `/api/health`, `/api/auth/register`, dan `/api/auth/login` wajib login; modul di luar hak akses peran dibalas **403**. Error dikembalikan sebagai `{ "error": "...", "fields": { "kolom": "pesan" } }`.
+Semua endpoint selain `/api/health`, `/api/auth/register`, dan `/api/auth/login` wajib login; modul di luar hak akses peran dibalas **403**. Error dikembalikan sebagai `{ "error": "...", "fields": { "kolom": "pesan" }, "requestId": "..." }`.
 
 | Metode & path | Keterangan |
 |---|---|
-| `GET /api/health` | Status server |
+| `GET /health` · `GET /api/health` | Health check: 200 bila server hidup **dan** MySQL bisa dihubungi (`SELECT 1`, batas 2 dtk), 503 bila database putus atau server sedang graceful shutdown. `/health` (tanpa `/api`) tidak terkena rate limiter — dipakai Docker/Nginx/skrip deploy |
 | `POST /api/auth/register` | `{ name, username, email, password, confirm }` → akun *Menunggu persetujuan* (201, tanpa token) |
 | `POST /api/auth/login` | `{ username, password }` → `{ token, expiresIn, user }` (`user.access` = hak akses per modul) |
 | `POST /api/auth/logout` | Cabut sesi token yang dipakai (204); token itu tidak berlaku lagi |
@@ -166,7 +189,8 @@ Semua endpoint selain `/api/health`, `/api/auth/register`, dan `/api/auth/login`
 | `GET /api/events` | Daftar acara; filter `from`, `to`, `status`, `venue`, `q` |
 | `POST /api/events` · `PUT/PATCH/DELETE /api/events/:id` | Kelola acara (admin) |
 | `POST /api/events/reset` | Pulihkan data contoh acara (admin) |
-| `GET /api/orders` | Transaksi tiket & sewa; filter `type`, `payment`, `eventId`, `q`, `limit` |
+| `GET /api/orders` | Transaksi tiket & sewa; filter `type`, `payment`, `method` (awalan), `ticket` (`aktif`/`belum`), `eventId`, `q`. Dengan `?page=1&limit=10` → **paginasi di database** `{ data, pagination: { page, limit, total, totalPages } }` (limit maks. 100); tanpa `page` → array biasa (maks. `limit`, bawaan 100) |
+| `GET /api/orders/stats` | Angka kartu Transaksi dari seluruh data: `{ verify, waiting, month: { key, ticket, rental } }` |
 | `GET /api/orders/export.csv` | Unduh transaksi sebagai CSV |
 | `POST /api/orders/:id/verify` | Verifikasi bukti transfer → lunas |
 | `POST /api/orders/:id/reject` | Minta pemesan mengunggah bukti ulang |

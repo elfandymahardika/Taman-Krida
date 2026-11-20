@@ -34,7 +34,7 @@ export const handleUpload = async (req: Request, res: Response) => {
     res.status(201).json({ message: 'File berhasil diunggah.', data: toDocument(doc) });
   } catch (dbError) {
     // 3. Rollback: hapus file fisik bila pencatatan database gagal, agar tidak ada file yatim.
-    console.error('Gagal mencatat dokumen ke database, file diunggah dihapus kembali:', dbError);
+    req.log.error({ err: dbError }, 'Gagal mencatat dokumen ke database, file diunggah dihapus kembali');
     await storageService.deleteFile(uploadResult.fileKey);
     throw new HttpError(500, 'Gagal mencatat metadata dokumen ke database. File fisik telah dibersihkan.');
   }

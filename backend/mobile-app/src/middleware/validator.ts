@@ -178,3 +178,28 @@ export const validateCommunity = validate((body) => {
     },
   };
 });
+
+/** Batas riwayat percakapan Tanya Krida yang dikirim aplikasi (menjaga biaya & ukuran permintaan). */
+export const ASSISTANT_LIMITS = { history: 12, question: 500, answer: 2000 };
+
+/**
+ * Validasi percakapan Tanya Krida: messages = [{ role: 'user' | 'assistant', content }], pesan terakhir dari pengguna.
+ * Hanya 12 pesan terakhir yang diteruskan ke AI; riwayat selalu dimulai dari pesan pengguna.
+ */
+export const validateAssistantChat = validate((body) => {
+  const raw = Array.isArray(body.messages) ? body.messages : [];
+  const messages = raw.map((m: any) => ({ role: m?.role, content: str(m?.content) }));
+  const last = messages[messages.length - 1];
+  let error: string | null = null;
+  if (!messages.length || raw.length > 50) error = 'Riwayat percakapan tidak valid.';
+  else if (messages.some((m: any) => (m.role !== 'user' && m.role !== 'assistant') || !m.content)) error = 'Setiap pesan wajib berisi role dan teks.';
+  else if (last.role !== 'user') error = 'Pesan terakhir harus pertanyaan pengguna.';
+  else if (last.content.length > ASSISTANT_LIMITS.question) error = `Pertanyaan maksimal ${ASSISTANT_LIMITS.question} karakter.`;
+
+  let recent = messages.slice(-ASSISTANT_LIMITS.history).map((m: any) => ({
+    role: m.role,
+    content: m.content.slice(0, m.role === 'user' ? ASSISTANT_LIMITS.question : ASSISTANT_LIMITS.answer),
+  }));
+  while (recent.length && recent[0].role !== 'user') recent = recent.slice(1);
+  return { data: { messages: recent }, errors: { messages: error } };
+}, 'Pertanyaan tidak dapat diproses.');

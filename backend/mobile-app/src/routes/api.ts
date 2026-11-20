@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { config } from '../config/env';
+import { healthCheck } from '../lib/health';
+import * as assistant from '../controllers/assistantController';
 import * as communities from '../controllers/communityController';
 import * as events from '../controllers/eventController';
 import { downloadFile } from '../controllers/fileController';
@@ -8,8 +10,10 @@ import * as notifications from '../controllers/notificationController';
 import * as rentals from '../controllers/rentalController';
 import * as tickets from '../controllers/ticketController';
 import { authMiddleware } from '../middleware/authMiddleware';
+import { assistantLimiter } from '../middleware/rateLimiter';
 import { proofUpload, rentalDocumentsUpload } from '../middleware/upload.middleware';
 import {
+  validateAssistantChat,
   validateCheckout,
   validateCommunity,
   validatePayment,
@@ -21,9 +25,8 @@ const router = Router();
 // ==========================================
 // RUTE PUBLIK (tanpa login): informasi yang tampil di aplikasi sebelum masuk
 // ==========================================
-router.get('/health', (_req, res) => {
-  res.json({ ok: true, service: 'tkbj-mobile-api', today: config.today });
-});
+// Sama dengan GET /health (app.ts), tetapi lewat pembatas /api; dipakai klien untuk cek koneksi.
+router.get('/health', healthCheck);
 
 router.get('/meta', info.getMeta);
 router.get('/home', info.getHome);
@@ -45,6 +48,9 @@ router.get('/communities/:id', communities.getCommunity);
 
 // Kalender ketersediaan venue boleh dilihat sebelum login (Cek Jadwal)
 router.get('/rentals/availability', rentals.getAvailability);
+
+// Tanya Krida (asisten AI): publik, hanya membaca data publik, dibatasi per IP karena memakai API AI berbayar.
+router.post('/assistant/chat', assistantLimiter, validateAssistantChat, assistant.chat);
 
 // Autentikasi pengunjung (register, login, logout, me, password) ada di routes/authRoutes.ts → /api/auth.
 

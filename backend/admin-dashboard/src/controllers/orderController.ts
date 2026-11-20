@@ -7,7 +7,19 @@ import { canView } from '../lib/roles';
 import { User } from '../models/userModel';
 import { addTicketsSold, findEventById } from '../models/eventModel';
 import { addMonthlySales } from '../models/financeModel';
-import { findOrderById, listOrders, markOrderPaid, Order, rejectOrderProof, toOrder } from '../models/orderModel';
+import { config } from '../config/env';
+import { paginated, pageRequest } from '../lib/pagination';
+import {
+  countOrders,
+  findOrderById,
+  listOrders,
+  markOrderPaid,
+  Order,
+  OrderFilter,
+  orderStats,
+  rejectOrderProof,
+  toOrder,
+} from '../models/orderModel';
 
 export const PAYMENT_METHODS = ['Transfer bank', 'QRIS', 'Tunai di loket'];
 
@@ -42,21 +54,39 @@ async function mustFind(id: string) {
   return order;
 }
 
-const listFromQuery = (query: Request['query'], limit?: number) =>
-  listOrders({
-    type: queryText(query.type),
-    payment: queryText(query.payment),
-    q: queryText(query.q),
-    eventId: queryText(query.eventId),
-    limit: limit ?? Math.min(Math.max(Number(query.limit) || 100, 1), 500),
-  });
+const filterFromQuery = (query: Request['query']): OrderFilter => ({
+  type: queryText(query.type),
+  payment: queryText(query.payment),
+  method: queryText(query.method),
+  ticket: queryText(query.ticket),
+  q: queryText(query.q).trim(),
+  eventId: queryText(query.eventId),
+});
 
-/** Daftar pesanan: modul Transaksi, atau pesanan tiket saja bagi peran yang boleh melihat Acara & tiket. */
+const listFromQuery = (query: Request['query'], limit?: number) =>
+  listOrders({ ...filterFromQuery(query), limit: limit ?? Math.min(Math.max(Number(query.limit) || 100, 1), 500) });
+
+/**
+ * Daftar pesanan: modul Transaksi, atau pesanan tiket saja bagi peran yang boleh melihat Acara & tiket.
+ * - `?page=1&limit=10` → paginasi di database: `{ data, pagination: { page, limit, total, totalPages } }`.
+ * - tanpa `page` → array biasa (maks. `limit`, bawaan 100) untuk widget kecil seperti transaksi terbaru di Beranda.
+ */
 export const getOrders = async (req: Request, res: Response) => {
   const role = res.locals.user.role_key;
   if (!canView(role, 'payments') && !(req.query.type === 'Tiket' && canView(role, 'events')))
     throw new HttpError(403, 'Peran Anda tidak memiliki akses ke modul Transaksi.');
-  res.json((await listFromQuery(req.query)).map(toOrder));
+
+  const page = pageRequest(req.query, { defaultLimit: 10, maxLimit: 100 });
+  if (!page) return res.json((await listFromQuery(req.query)).map(toOrder));
+
+  const filter = filterFromQuery(req.query);
+  const [rows, total] = await Promise.all([listOrders({ ...filter, ...page }), countOrders(filter)]);
+  res.json(paginated(rows.map(toOrder), total, page));
+};
+
+/** Angka kartu ringkasan Transaksi: perlu verifikasi, menunggu bayar, dan transaksi bulan berjalan (WIB). */
+export const getOrderStats = async (_req: Request, res: Response) => {
+  res.json(await orderStats(config.today.slice(0, 7)));
 };
 
 export const exportOrdersCsv = async (req: Request, res: Response) => {

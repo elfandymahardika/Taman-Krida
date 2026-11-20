@@ -1,0 +1,137 @@
+import 'package:flutter/material.dart';
+
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../domain/entities/rental_request.dart';
+import '../../routes/app_routes.dart';
+import '../../styles/rental_status_style.dart';
+import '../../controllers/controllers.dart';
+import '../../widgets/common/app_button.dart';
+import '../../widgets/common/app_card.dart';
+import '../../widgets/common/load_status.dart';
+import '../../widgets/common/pill_badge.dart';
+import '../../widgets/common/refresh_on_open.dart';
+import '../../widgets/layout/content_section.dart';
+import '../../widgets/layout/responsive_grid.dart';
+import '../../widgets/layout/tkbj_scaffold.dart';
+
+/// Riwayat sewa gedung (node 157:3050 "mobile-riwayat-sewa").
+class RentalHistoryScreen extends StatelessWidget {
+  const RentalHistoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final rentalController = context.watch<RentalController>();
+    final authController = context.watch<AuthController>();
+    final rentals = rentalController.rentals;
+    final navigator = Navigator.of(context);
+
+    return RefreshOnOpen(
+      child: TkbjScaffold(
+        title: 'Riwayat Sewa Gedung',
+        subtitle: 'Pantau status setiap pengajuan sewa venue Anda.',
+        children: [
+          ContentSection(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (rentals.isEmpty)
+                  LoadStatus(
+                    loading: authController.accountLoading,
+                    error: authController.accountLoading
+                        ? null
+                        : 'Belum ada pengajuan sewa gedung.',
+                  )
+                else
+                  ResponsiveGrid(
+                    spacing: 16,
+                    children: [
+                      for (final rental in rentals) _RentalCard(rental: rental),
+                    ],
+                  ),
+                const SizedBox(height: 16),
+                AppButton(
+                  label: '+ Ajukan Sewa Baru',
+                  onPressed: () {
+                    context.read<RentalController>().startRental();
+                    navigator.pushNamed(AppRoutes.rental);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RentalCard extends StatelessWidget {
+  const _RentalCard({required this.rental});
+
+  final RentalRequest rental;
+
+  @override
+  Widget build(BuildContext context) {
+    final (String action, String route) = switch (rental.status) {
+      RentalStatus.paid => ('Lihat Bukti Reservasi', AppRoutes.rentalReceipt),
+      RentalStatus.approved when rental.isVerifyingPayment => (
+        'Lihat Status Pembayaran',
+        AppRoutes.rentalStatus,
+      ),
+      RentalStatus.approved => ('Lanjut Bayar Sewa', AppRoutes.rentalPayment),
+      RentalStatus.pending => ('Lihat Status', AppRoutes.rentalStatus),
+      RentalStatus.rejected => (
+        'Lihat Catatan & Ajukan Ulang',
+        AppRoutes.rentalRejected,
+      ),
+    };
+
+    return AppCard(
+      padding: const EdgeInsets.all(15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  rental.code,
+                  style: AppText.poppins(13, weight: FontWeight.w600),
+                ),
+              ),
+              PillBadge(
+                rental.isVerifyingPayment
+                    ? 'Pembayaran Diverifikasi'
+                    : rental.status.label,
+                color: rental.status.color,
+                background: rental.status.background,
+                fontSize: 10,
+                weight: FontWeight.w700,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            rental.facility.name,
+            style: AppText.poppins(14, weight: FontWeight.w600),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${Formatters.longDate(rental.date)} · ${rental.timeLabel}',
+            style: AppText.poppins(11, color: AppColors.muted),
+          ),
+          const SizedBox(height: 10),
+          AppButton.outline(
+            label: action,
+            fontSize: 13,
+            onPressed: () =>
+                Navigator.of(context).pushNamed(route, arguments: rental.code),
+          ),
+        ],
+      ),
+    );
+  }
+}

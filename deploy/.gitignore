@@ -1,0 +1,5 @@
+# Rahasia produksi
+.env
+# Sertifikat TLS & kunci privat
+nginx/certs/*
+!nginx/certs/.gitkeep

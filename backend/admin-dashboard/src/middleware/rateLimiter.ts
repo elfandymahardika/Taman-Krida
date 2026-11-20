@@ -1,10 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
+import { config } from '../config/env';
 import { HttpError } from '../lib/http';
 
 /*
- * Pembatas percobaan berulang (login & registrasi). Perlindungan tambahan terhadap tebak password dan
- * pendaftaran massal — bukan pengganti validasi. Disimpan di memori proses: cukup untuk satu server;
- * bila backend dijalankan di beberapa instance, pindahkan penyimpanannya ke Redis/database.
+ * Pembatas permintaan berulang → 429 Too Many Requests. Perlindungan tambahan terhadap banjir permintaan,
+ * tebak password, dan pendaftaran massal — bukan pengganti validasi.
+ * - apiLimiter      : batas umum semua rute /api (dipasang di app.ts).
+ * - loginLimiter    : endpoint sensitif, hanya percobaan login GAGAL yang dihitung.
+ * - registerLimiter : endpoint sensitif, pendaftaran per IP.
+ * Kunci penghitung = req.ip; di belakang proxy (Next.js, Ngrok) nilainya IP pengguna asli berkat `trust proxy`
+ * (config.trustProxy), jadi staf tidak saling memblokir walau semua permintaan lewat server Next.js.
+ * Penghitung disimpan di memori proses: cukup untuk satu server. Bila backend dijalankan di beberapa instance,
+ * pindahkan penyimpanannya ke store bersama (Redis/database) agar batasnya berlaku gabungan.
  */
 
 interface Bucket {
@@ -26,7 +33,10 @@ interface RateLimitOptions {
 
 const minutesLeft = (ms: number) => Math.max(1, Math.ceil(ms / 60_000));
 
-/** Middleware pembatas: lebih dari `max` permintaan per `windowMs` per kunci → 429 + header Retry-After. */
+/**
+ * Middleware pembatas: lebih dari `max` permintaan per `windowMs` per kunci → 429 + header Retry-After.
+ * Setiap respons membawa header RateLimit-Limit / RateLimit-Remaining / RateLimit-Reset (detik).
+ */
 export function rateLimit({ windowMs, max, key = (req) => req.ip ?? 'unknown', skipSuccessful = false, message }: RateLimitOptions) {
   const buckets = new Map<string, Bucket>();
 
@@ -38,8 +48,12 @@ export function rateLimit({ windowMs, max, key = (req) => req.ip ?? 'unknown', s
       bucket = { count: 0, resetAt: now + windowMs };
       buckets.set(id, bucket);
     }
+    const resetSeconds = String(Math.ceil((bucket.resetAt - now) / 1000));
+    res.setHeader('RateLimit-Limit', String(max));
+    res.setHeader('RateLimit-Remaining', String(Math.max(0, max - bucket.count - 1)));
+    res.setHeader('RateLimit-Reset', resetSeconds);
     if (bucket.count >= max) {
-      res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+      res.setHeader('Retry-After', resetSeconds);
       return next(new HttpError(429, `${message} Coba lagi dalam ${minutesLeft(bucket.resetAt - now)} menit.`));
     }
     bucket.count++;
@@ -50,6 +64,13 @@ export function rateLimit({ windowMs, max, key = (req) => req.ip ?? 'unknown', s
     next();
   };
 }
+
+/** Batas umum semua rute /api per IP (RATE_LIMIT_MAX per RATE_LIMIT_WINDOW_MIN menit, lihat config/env.ts). */
+export const apiLimiter = rateLimit({
+  windowMs: config.rateLimit.windowMs,
+  max: config.rateLimit.max,
+  message: 'Terlalu banyak permintaan dari perangkat ini.',
+});
 
 /** Login: maksimal 20 percobaan GAGAL per IP per 15 menit (login berhasil tidak dihitung). */
 export const loginLimiter = rateLimit({

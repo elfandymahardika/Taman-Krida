@@ -65,6 +65,13 @@ Pemetaan per berkas ada di README [backend](backend/admin-dashboard/README.md#ch
 
 Perencanaan data & hak aksesnya: [docs/fitur-dan-akses.md](docs/fitur-dan-akses.md). Rincian per langkah ada di README [frontend](frontend/admin-dashboard/README.md#modul-02--03--ruang-kerja-staf) dan [backend](backend/admin-dashboard/README.md#modul-03--upload-berkas--storage).
 
+## CHECK POINT — Performa & Deployment (bagian 6 & 7)
+
+Mengikuti [Panduan CHECK POINT](https://app.notion.com/p/Panduan-CHECK-POINT-3d51fdd9f0e58066920ccf88c5737dba):
+
+- **6. Performa (web dashboard)** — paginasi di server (`?page=&limit=`) untuk tabel Transaksi & Tiket, tabel tidak "melompat" saat pindah halaman (CLS), pencarian di-*debounce* (INP), foto unggahan dioptimasi `<Image/>` + `sizes`, pemantauan Core Web Vitals (`/api/vitals`), analisis bundle. Rincian & hasil ukur: [frontend/admin-dashboard/docs/performa.md](frontend/admin-dashboard/docs/performa.md).
+- **7. Deployment, CI/CD & produksi** — Dockerfile multi-stage untuk ketiga aplikasi, Docker Compose + Nginx (reverse proxy & TLS), `/health` yang mengecek MySQL, graceful shutdown (SIGTERM), rilis tanpa downtime dengan rollback otomatis, GitHub Actions (lint, test, build, image, deploy), strategi migration *expand-contract*. Rincian: [deploy/README.md](deploy/README.md).
+
 ## Menjalankan
 
 ```bash

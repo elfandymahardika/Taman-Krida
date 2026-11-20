@@ -1,5 +1,6 @@
 import { EVENT_STATUSES, VENUES, eventStore, formatDate, timeRange, validateEvent } from './events'
 import type { Event } from './events'
+import { todayWib } from './format'
 import type { DetailOptions, FormOptions } from '../components/overlay'
 
 /**
@@ -7,7 +8,7 @@ import type { DetailOptions, FormOptions } from '../components/overlay'
  * `list` = daftar acara saat ini, untuk cek duplikat. `date` = tanggal awal untuk acara baru
  * (mis. tanggal yang dipilih di kalender).
  */
-export const eventForm = (list: Event[], e?: Event, date = '2026-10-15'): FormOptions => ({
+export const eventForm = (list: Event[], e?: Event, date = todayWib()): FormOptions => ({
   title: e ? 'Edit acara' : 'Tambah acara',
   subtitle: e ? e.name : 'Lengkapi data lalu simpan. Kolom bertanda * wajib diisi.',
   success: e ? 'Perubahan acara tersimpan' : 'Data acara berhasil ditambahkan',

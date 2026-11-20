@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ErrorBanner, Filters, PageFooter } from '@/components/ui'
 import { useOverlay } from '@/components/overlay'
 import { VENUES, useEvents } from '@/data/events'
+import { todayWib } from '@/data/format'
 import { mutate, useQuery } from '@/lib/api'
 import Hero from './hero'
 import RingkasanSewa from './ringkasansewa'
@@ -19,7 +20,7 @@ export default function Sewa() {
   const summary = useQuery('/dashboard/summary').data
   const rentalsQ = useQuery('/rentals', { refreshInterval: 30000 })
   const rentals = rentalsQ.data ?? NONE
-  const today = summary?.today ?? '2026-10-02'
+  const today = summary?.today ?? todayWib()
   const [selectedId, setSelectedId] = useState(null)
   const [query, setQuery] = useState('')
   const [venue, setVenue] = useState('Semua fasilitas')

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { pipeline } from 'stream/promises';
 import { notFound } from '../lib/http';
 import { openFile } from '../lib/storage';
 import { findVisitorFile } from '../models/fileModel';
@@ -15,5 +16,6 @@ export const downloadFile = async (req: Request<{ id: string }>, res: Response) 
   res.setHeader('Cache-Control', 'private, no-store');
   res.attachment(file.name);
   res.type(file.mime);
-  stream.pipe(res);
+  // pipeline: error saat mengalirkan berkas (mis. koneksi storage putus) diteruskan ke error handler, tidak membuat proses crash.
+  await pipeline(stream, res);
 };

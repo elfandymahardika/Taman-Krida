@@ -72,16 +72,64 @@ export const findOrderById = async (id: string, db: Queryable = pool): Promise<O
   return rows[0] ?? null;
 };
 
-export const listOrders = async (q: { type?: string; payment?: string; q?: string; eventId?: string; limit: number }) => {
+export interface OrderFilter {
+  type?: string;
+  payment?: string;
+  /** Awalan metode bayar (mis. "Transfer" cocok dengan "Transfer bank" & "Transfer BCA"). */
+  method?: string;
+  /** Status tiket: "aktif" (sudah lunas) atau "belum" (belum terbit). */
+  ticket?: string;
+  q?: string;
+  eventId?: string;
+}
+
+const orderWhere = (q: OrderFilter) => {
   const pattern = q.q ? likePattern(q.q) : '';
-  const filter = where([
+  return where([
     q.type && ['o.type = ?', q.type],
     q.payment && ['o.payment = ?', q.payment],
+    // likePattern = "%teks%"; tanpa "%" depan → cocok dengan awalan saja.
+    q.method && ['COALESCE(o.method, o.proof_method) LIKE ?', likePattern(q.method).slice(1)],
+    q.ticket === 'aktif' && ["o.payment = 'Lunas'"],
+    q.ticket === 'belum' && ["o.payment <> 'Lunas'"],
     q.eventId && ['o.event_id = ?', q.eventId],
     q.q && ['(o.id LIKE ? OR o.customer LIKE ? OR o.service LIKE ?)', pattern, pattern, pattern],
   ]);
-  const [rows] = await pool.execute<OrderRow[]>(`${SELECT} ${filter.sql} ORDER BY o.created_at DESC LIMIT ${q.limit}`, filter.params);
+};
+
+/** Daftar pesanan terbaru sesuai filter. `offset` dipakai paginasi (`?page=`). */
+export const listOrders = async (q: OrderFilter & { limit: number; offset?: number }) => {
+  const filter = orderWhere(q);
+  const [rows] = await pool.execute<OrderRow[]>(
+    `${SELECT} ${filter.sql} ORDER BY o.created_at DESC, o.id DESC LIMIT ${q.limit} OFFSET ${q.offset ?? 0}`,
+    filter.params,
+  );
   return rows;
+};
+
+/** Jumlah seluruh pesanan yang cocok dengan filter (untuk total halaman). */
+export const countOrders = async (q: OrderFilter) => {
+  const filter = orderWhere(q);
+  const [[row]] = await pool.execute<RowDataPacket[]>(`SELECT COUNT(*) AS n FROM orders o ${filter.sql}`, filter.params);
+  return row.n as number;
+};
+
+/** Angka kartu ringkasan modul Transaksi, dihitung di database (bukan dari daftar yang sudah dipotong). */
+export const orderStats = async (month: string) => {
+  const [[row]] = await pool.execute<RowDataPacket[]>(
+    `SELECT
+       COALESCE(SUM(payment = 'Perlu verifikasi'), 0) AS verify,
+       COALESCE(SUM(payment = 'Menunggu bayar'), 0) AS waiting,
+       COALESCE(SUM(DATE_FORMAT(created_at, '%Y-%m') = ? AND type = 'Tiket'), 0) AS monthTicket,
+       COALESCE(SUM(DATE_FORMAT(created_at, '%Y-%m') = ? AND type <> 'Tiket'), 0) AS monthRental
+     FROM orders`,
+    [month, month],
+  );
+  return {
+    verify: Number(row.verify),
+    waiting: Number(row.waiting),
+    month: { key: month, ticket: Number(row.monthTicket), rental: Number(row.monthRental) },
+  };
 };
 
 export const countOrdersForEvent = async (eventId: string) => {

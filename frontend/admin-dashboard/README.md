@@ -132,16 +132,17 @@ npm install
 npm run dev
 ```
 
-Buka http://localhost:3000, lalu login memakai akun demo. Alamat backend diatur lewat `NEXT_PUBLIC_API_URL` di `.env.local` (salin dari `.env.example`; bawaan `http://localhost:5000/api`). Untuk memakai backend rekan tim via Ngrok, isi `NEXT_PUBLIC_API_URL=https://xxxxx.ngrok-free.app/api` lalu restart `npm run dev`. Bila backend mati, halaman menampilkan pesan "Data belum bisa dimuat" dengan tombol **Coba lagi**.
+Buka http://localhost:3000, lalu login memakai akun demo. Alamat backend diatur lewat `API_URL` di `.env.local` (salin dari `.env.example`; bawaan `http://localhost:5000/api`). Untuk memakai backend rekan tim via Ngrok, isi `API_URL=https://xxxxx.ngrok-free.app/api` lalu restart `npm run dev`. (`API_URL` dibaca saat server berjalan, bukan dikunci saat build seperti `NEXT_PUBLIC_*`; `NEXT_PUBLIC_API_URL` di `.env.local` lama masih dibaca sebagai cadangan.) Bila backend mati, halaman menampilkan pesan "Data belum bisa dimuat" dengan tombol **Coba lagi**.
 
 ### Build produksi
 
 ```bash
-npm run build     # hasil di folder .next/
-npm run start     # menjalankan hasil build di http://localhost:3000
+npm run build              # hasil di folder .next/ (termasuk .next/standalone untuk Docker)
+npm run start              # menjalankan hasil build di http://localhost:3000
+npm run analyze            # analisis ukuran bundle JavaScript (UI interaktif)
 ```
 
-Semua halaman di-*prerender* sebagai halaman statis oleh Next.js. Cara termudah untuk online adalah mengimpor repository ini ke [Vercel](https://vercel.com) (pilih folder `admin-dashboard` sebagai *Root Directory*).
+Uji performa (Lighthouse) **selalu** di hasil build produksi, bukan `npm run dev` — lihat [docs/performa.md](docs/performa.md). Deployment produksi (Docker, Nginx, CI/CD): [deploy/README.md](../../deploy/README.md).
 
 ---
 
@@ -155,6 +156,7 @@ Semua halaman di-*prerender* sebagai halaman statis oleh Next.js. Cara termudah 
 | [lucide-react](https://lucide.dev) | 1.52.0 | Ikon, sama dengan ikon pada desain Figma |
 | [oxlint](https://oxc.rs) | 1.87.0 | Linter (`npm run lint`), dengan plugin aturan Next.js |
 | [typescript](https://www.typescriptlang.org) | 7.0.2 | Pemeriksaan tipe (`.ts` / `.tsx`), dijalankan otomatis saat `next build` |
+| [vitest](https://vitest.dev) + [Testing Library](https://testing-library.com) | 5.1 · 16.3 | Unit test (`npm test`, folder `tests/`) dengan jsdom |
 
 Font Inter, Playfair Display, dan Poppins dimuat lewat `next/font/google`. Foto memakai `next/image`. Styling memakai CSS biasa dengan design token (`src/index.css`), tanpa framework CSS.
 
@@ -176,9 +178,9 @@ Font Inter, Playfair Display, dan Poppins dimuat lewat `next/font/google`. Foto 
 |---|---|
 | ![Pendaftaran terkirim](docs/screenshots/14-register-berhasil.png) | ![Menunggu persetujuan](docs/screenshots/15-login-menunggu-persetujuan.png) |
 
-| Admin menyetujui pendaftar & memilih peran | Akun demo per peran |
-|---|---|
-| ![Persetujuan](docs/screenshots/16-persetujuan-pendaftar.png) | ![Akun demo](docs/screenshots/20-login-akun-demo.png) |
+| Admin menyetujui pendaftar & memilih peran |
+|---|
+| ![Persetujuan](docs/screenshots/16-persetujuan-pendaftar.png) |
 
 | 403 Akses ditolak (Admin Konten membuka /transaksi) | Mode lihat saja (Admin Konten di /acara) |
 |---|---|
@@ -223,7 +225,7 @@ Font Inter, Playfair Display, dan Poppins dimuat lewat `next/font/google`. Foto 
 
 | Rute | Halaman | Isi utama |
 |---|---|---|
-| `/login` | Login | Login ke backend dengan validasi, akun demo per peran |
+| `/login` | Login | Login ke backend dengan validasi |
 | `/register` | Daftar akun | Registrasi staf (menunggu persetujuan admin) |
 | `/` | Dashboard | Metrik, agenda, antrean tindak lanjut, transaksi, aktivitas |
 | `/acara` | Acara & kalender | **CRUD acara**, kalender bulanan, filter |
@@ -334,7 +336,7 @@ Pratinjau tampilannya ada di halaman **Transaksi & pembayaran**, pada panel "Ver
 │   │   ├── cookie.ts      nama cookie sesi
 │   │   └── access.ts      RBAC di UI: modul per halaman, useAccess()
 │   ├── data/
-│   │   ├── auth.ts        akun demo + refresh profil dari /auth/me
+│   │   ├── auth.ts        refresh profil dari /auth/me
 │   │   ├── events.ts      format & validasi acara, store CRUD lewat API
 │   │   ├── finance.ts     format angka juta rupiah
 │   │   ├── eventforms.ts  modal formulir & rincian acara (dipakai Dashboard dan Acara)
@@ -376,3 +378,24 @@ Validasi frontend hanya memberi pesan cepat. Backend memeriksa ulang dengan atur
 **Lampiran dari aplikasi pengunjung.** Admin bisa membuka berkas yang diunggah lewat aplikasi; berkas dibuka di tab baru lewat `openFile()` di `lib/api.ts`:
 - **Transaksi → Verifikasi pembayaran:** klik nama berkas untuk membuka bukti transfer.
 - **Sewa → Tinjau berkas:** KTP, surat permohonan, dan proposal.
+
+## CHECK POINT 11 — Keamanan, Error & Logging (frontend)
+
+Bagian 5 panduan. Bagian backend (Helmet, rate limit, error handler, pino) ada di [README backend](../../backend/admin-dashboard/README.md#keamanan-error--logging).
+
+| File panduan | Di proyek ini | Isi |
+|---|---|---|
+| `next.config.js` | [`next.config.mjs`](next.config.mjs) | `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`. `/uploads/*` memakai `SAMEORIGIN` agar pratinjau PDF (iframe) di menu Dokumen tetap jalan. `allowedOrigins` tidak diatur karena tidak dibutuhkan |
+| File Server Action | [`(auth)/actions.ts`](src/app/(auth)/actions.ts), [`catatan/actions.ts`](src/app/(dashboard)/catatan/actions.ts) | Setiap action memeriksa sesi (DAL) + peran bila perlu, validasi Zod, lalu mengembalikan pesan secukupnya. Login/daftar memang publik; IP pengguna diteruskan ke backend agar rate limit dihitung per pengguna |
+| `app/error.tsx` | [`src/app/error.tsx`](src/app/error.tsx), [`src/app/(dashboard)/error.tsx`](src/app/(dashboard)/error.tsx) | Error boundary per segmen (Client Component): pesan aman, tombol **Coba lagi** (`retry()`), dan kode digest untuk dicari di log. Versi panel tetap menampilkan sidebar |
+| Event handler | `try/catch` di setiap aksi + [`components/overlay.tsx`](src/components/overlay.tsx) | Error klik/simpan tidak ditangkap error boundary, jadi ditampilkan sebagai toast error dan modal tetap terbuka. Error 5xx dari API diberi kode rujukan dari `requestId` backend ([`lib/api.ts`](src/lib/api.ts)) |
+| `app/not-found.tsx` | [`src/app/not-found.tsx`](src/app/not-found.tsx) | Halaman 404 (status HTTP 404) untuk rute tak dikenal / `notFound()` |
+| `app/global-error.tsx` | [`src/app/global-error.tsx`](src/app/global-error.tsx) | Error di root layout; menyediakan `<html>` dan `<body>` sendiri |
+| `instrumentation.ts` | [`src/instrumentation.ts`](src/instrumentation.ts) | `onRequestError` mencatat error server Next.js (pesan, digest, method, path tanpa query, rute) sebagai JSON; cookie, Authorization, dan query tidak dicatat |
+| Tes | [`tests/`](tests) | Halaman error & 404, `global-error`, respons saat API gagal (500/400/502/jaringan/401), proxy `/api/be` (IP, token, header aman), header keamanan, `onRequestError`, error di event handler |
+
+```bash
+npm test          # sekali jalan
+npm run test:watch
+```
+

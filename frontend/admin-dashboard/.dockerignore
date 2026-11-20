@@ -1,0 +1,16 @@
+# Jangan ikut terkirim ke Docker build context / image:
+# rahasia (.env.local), dependency lokal, hasil build lama, dan test.
+.env
+.env.*
+!.env.example
+node_modules
+.next
+out
+coverage
+tests
+*.tsbuildinfo
+*.log
+docs
+Dockerfile
+.dockerignore
+.git

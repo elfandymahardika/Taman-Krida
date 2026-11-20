@@ -56,6 +56,7 @@ void main() {
     ]);
     await _loadFamily('TkbjSymbolsMath', ['assets/fonts/TkbjSymbolsMath.ttf']);
     await _loadFamily('TkbjSymbols2', ['assets/fonts/TkbjSymbols2.ttf']);
+    await _loadFamily('MaterialIcons', ['fonts/MaterialIcons-Regular.otf']);
     await _loadEmojiFont();
   });
 

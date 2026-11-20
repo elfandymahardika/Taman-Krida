@@ -1,20 +1,22 @@
 import Image from 'next/image'
-import { PHOTOS, asset } from '@/data/sample'
+import { asset } from '@/data/sample'
+import HeroSlideshow from './hero-slideshow'
 
 /** Panel foto & tagline di sisi kiri halaman login dan registrasi. */
 export default function Hero() {
   return (
     <aside className="login__hero">
-      <Image className="login__photo" src={PHOTOS.topeng.src} alt="" fill sizes="50vw" preload />
+      <HeroSlideshow />
       <div className="login__hero-content">
-        <div className="brand__mark">
-          <Image src={asset('brand-mark.svg')} alt="" width={30} height={30} />
-          <span className="brand__name" style={{ color: '#fff' }}>
-            TKBJ
+        <div className="login__brand">
+          <Image src={asset('logo-tkbj.svg')} alt="Logo TKBJ" width={56} height={56} />
+          <span className="login__brand-name">
+            Taman Krida Budaya
+            <small>Jawa Timur</small>
           </span>
         </div>
         <h2 className="login__tagline">Ruang bersama untuk seni dan budaya Jawa Timur.</h2>
-        <p className="login__caption">Taman Krida Budaya Jawa Timur · Disbudpar Provinsi Jawa Timur</p>
+        <p className="login__caption">Dinas Kebudayaan dan Pariwisata Provinsi Jawa Timur</p>
       </div>
     </aside>
   )
