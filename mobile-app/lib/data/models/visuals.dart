@@ -19,7 +19,7 @@ class FacilityLayout {
 }
 
 /// Aset visual aplikasi untuk data dari server. Server hanya mengirim kunci
-/// foto (`wayang`, `topeng`, `ketoprak`) atau URL foto unggahan admin.
+/// foto bawaan (`wayang`, `topeng`, `pendopo`, …) atau URL foto unggahan admin.
 abstract final class Visuals {
   /// Kunci `id` fasilitas di dashboard → posisi pin & foto denah.
   static const facilityLayouts = {
@@ -30,7 +30,7 @@ abstract final class Visuals {
           'Bangunan utama berarsitektur joglo limasan terbuka untuk '
           'pertunjukan tari kolosal & wayang.',
       imageAsset: AppImages.fasilitasPendopo,
-      mapPosition: MapPoint(0.198, 0.254),
+      mapPosition: MapPoint(-7.94266, 112.62251),
     ),
     'panggung': FacilityLayout(
       number: 2,
@@ -39,7 +39,7 @@ abstract final class Visuals {
           'Amfiteater ruang terbuka bernuansa alam untuk pertunjukan '
           'sendratari kolosal & festival.',
       imageAsset: AppImages.fasilitasPanggung,
-      mapPosition: MapPoint(0.534, 0.213),
+      mapPosition: MapPoint(-7.94303, 112.62276),
     ),
     'galeri': FacilityLayout(
       number: 3,
@@ -48,7 +48,7 @@ abstract final class Visuals {
           'Ruang pameran seni rupa indoor modern, lokakarya kriya, dan '
           'pameran tertutup.',
       imageAsset: AppImages.fasilitasGedung,
-      mapPosition: MapPoint(0.673, 0.629),
+      mapPosition: MapPoint(-7.94256, 112.62214),
     ),
     'loket': FacilityLayout(
       number: 4,
@@ -57,7 +57,7 @@ abstract final class Visuals {
           'Fasilitas parkir luas terkendali, area loket terintegrasi, '
           'toilet, serta mushola.',
       imageAsset: AppImages.fasilitasParkir,
-      mapPosition: MapPoint(0.254, 0.713),
+      mapPosition: MapPoint(-7.94228, 112.62246),
     ),
   };
 
@@ -69,6 +69,14 @@ abstract final class Visuals {
       'wayang' => AppImages.acaraWayang,
       'topeng' => AppImages.acaraTopeng,
       'ketoprak' => AppImages.acaraKetoprak,
+      // Kunci foto materi Edukasi (sama dengan BUILTIN_PHOTOS di backend).
+      'pendopo' => AppImages.fasilitasPendopo,
+      'panggung' => AppImages.fasilitasPanggung,
+      'gedung' => AppImages.fasilitasGedung,
+      'parkir' => AppImages.fasilitasParkir,
+      'gamelan' => AppImages.gamelan,
+      'sanggar' => AppImages.latihanSanggar,
+      'jaranan' => AppImages.jaranan,
       _ => null,
     };
   }

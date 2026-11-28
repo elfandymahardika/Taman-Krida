@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { FileText, Sparkles } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import { Badge, Card, DetailRow, Field, Note } from '@/components/ui'
 import { useOverlay } from '@/components/overlay'
 import { rupiah, wibDateTime } from '@/data/format'
@@ -64,21 +64,6 @@ export default function VerifikasiPembayaran({ order: selected }: { order: any }
       <p className="muted" style={{ fontSize: 11, lineHeight: 1.5 }}>
         Keputusan tersimpan di server dan tercatat di log aktivitas · Tidak memproses dana nyata.
       </p>
-      <div className="ai-plan">
-        <p className="ai-plan__head">
-          <Sparkles strokeWidth={1.75} /> Rencana fitur AI · Pemeriksa bukti transfer
-        </p>
-        <p>
-          Tahap berikutnya, AI akan membaca foto bukti transfer (OCR), lalu mencocokkan nominal, nama pengirim,
-          dan tanggal dengan tagihan. Hasilnya berupa saran keputusan dan skor keyakinan. Keputusan akhir tetap
-          di tangan admin.
-        </p>
-        <ul>
-          <li>Contoh saran: “Cocok 96% · nominal &amp; nama sesuai”</li>
-          <li>Menandai bukti yang diedit atau dipakai ulang</li>
-        </ul>
-        <Badge tone="neutral">Belum aktif · rancangan</Badge>
-      </div>
     </Card>
   )
 }

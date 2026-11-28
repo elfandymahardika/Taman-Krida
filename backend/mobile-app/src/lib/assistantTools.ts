@@ -4,7 +4,8 @@ import { getSettings, maxTickets, payDeadlineHours, readKv } from '../models/adm
 import { findActiveCommunity, listActiveCommunities, toCommunity } from '../models/communityModel';
 import { findPublishedEvent, listPublishedEvents, toEvent } from '../models/eventModel';
 import { findFacilityById, listFacilities, listPublishedContents, rentalRateOf, toFacility } from '../models/infoModel';
-import { CULTURE_ENTRIES, findCulture } from './cultureKnowledge';
+import { CultureTopic, findPublishedCultureTopic, listPublishedCultureTopics, toCultureTopic } from '../models/cultureModel';
+import { CULTURE_ENTRIES, CultureEntry, findCulture } from './cultureKnowledge';
 import { COMMUNITY_CATEGORIES, EVENT_CATEGORIES, PAYMENT_METHODS, RENTAL_DOCUMENTS, RENTAL_SLOTS } from './catalog';
 import { rupiah } from './format';
 import { likePattern, where } from './http';
@@ -216,6 +217,36 @@ const infoLayanan: Tool = {
   },
 };
 
+/** Materi dashboard → bentuk entri pengetahuan (linimasa & makna jadi kalimat). */
+const topicFields = (t: CultureTopic) => {
+  const topic = toCultureTopic(t);
+  return {
+    judul: topic.title,
+    ringkasan: topic.headline,
+    sejarah: topic.history,
+    linimasa: topic.timeline.map((p) => `${p.label}: ${p.text}`),
+    makna: topic.philosophy.map((p) => `${p.title}: ${p.text}`),
+  };
+};
+
+/**
+ * Basis pengetahuan budaya terkini: entri statis (cultureKnowledge.ts) yang isinya ditimpa materi Edukasi
+ * terpublikasi dari database, ditambah materi dashboard yang belum punya entri statis. Entri yang materinya
+ * belum/tidak lagi terbit tetap dipakai sebagai pengetahuan, tetapi tanpa `idMateri` (tanpa tombol "Baca materi").
+ */
+export async function cultureEntries(): Promise<CultureEntry[]> {
+  const topics = await listPublishedCultureTopics();
+  const byId = new Map(topics.map((t) => [t.id, t]));
+  const known = CULTURE_ENTRIES.map((e) => {
+    const topic = e.idMateri ? byId.get(e.idMateri) : undefined;
+    return topic ? { ...e, ...topicFields(topic) } : { ...e, idMateri: undefined };
+  });
+  const extra = topics
+    .filter((t) => !CULTURE_ENTRIES.some((e) => e.idMateri === t.id))
+    .map((t) => ({ id: t.id, idMateri: t.id, kategori: t.category, kataKunci: [t.title.toLowerCase()], ...topicFields(t) }));
+  return [...known, ...extra];
+}
+
 const materiBudaya: Tool = {
   definition: {
     name: 'materi_budaya',
@@ -232,8 +263,9 @@ const materiBudaya: Tool = {
     },
   },
   run: async (input) => {
-    const found = findCulture(textOf(input.topik, 80)).slice(0, 2);
-    const topics = CULTURE_ENTRIES.map((e) => e.judul);
+    const entries = await cultureEntries();
+    const found = findCulture(textOf(input.topik, 80), entries).slice(0, 2);
+    const topics = entries.map((e) => e.judul);
     if (!found.length) {
       return { ditemukan: false, catatan: 'Topik tidak ada di materi aplikasi. Boleh dijawab dari pengetahuan umum bila yakin benar.', topik_tersedia: topics };
     }
@@ -300,9 +332,9 @@ export async function resolveLinks(raw: unknown): Promise<{ kind: LinkKind; id?:
       const facility = id ? await findFacilityById(id) : null;
       link = facility && rentalRateOf(facility) !== null ? { kind, id, label: `Sewa ${facility.name}` } : { kind, label: 'Ajukan Sewa Gedung' };
     } else if (kind === 'edukasi') {
-      // id = id materi Edukasi Budaya di aplikasi → tombol langsung ke materinya.
-      const entry = id ? CULTURE_ENTRIES.find((e) => e.idMateri === id) : undefined;
-      link = entry ? { kind, id, label: `Baca materi ${entry.judul}` } : { kind, label: FIXED_LABELS.edukasi! };
+      // id = id materi Edukasi Budaya yang terpublikasi → tombol langsung ke materinya.
+      const topic = id ? await findPublishedCultureTopic(id) : null;
+      link = topic ? { kind, id, label: `Baca materi ${topic.title}` } : { kind, label: FIXED_LABELS.edukasi! };
     } else {
       link = { kind, label: FIXED_LABELS[kind]! };
     }

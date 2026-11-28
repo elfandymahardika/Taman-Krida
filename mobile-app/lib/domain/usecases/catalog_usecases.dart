@@ -3,10 +3,11 @@ import '../entities/community.dart';
 import '../entities/cultural_event.dart';
 import '../entities/facility.dart';
 import '../entities/gallery_item.dart';
+import '../entities/news_item.dart';
 import '../repositories/catalog_repository.dart';
 
 /// Memuat seluruh data publik: aturan aplikasi dulu, lalu acara, fasilitas,
-/// komunitas, dan galeri secara paralel.
+/// komunitas, galeri, dan konten beranda secara paralel.
 class GetCatalogUseCase {
   const GetCatalogUseCase(this._repository);
 
@@ -21,6 +22,7 @@ class GetCatalogUseCase {
       _repository.getFacilities(),
       _repository.getCommunities(),
       _repository.getGallery(),
+      _repository.getNews(),
     ]);
     return Catalog(
       meta: meta,
@@ -28,6 +30,7 @@ class GetCatalogUseCase {
       facilities: results[1] as List<Facility>,
       communities: results[2] as List<Community>,
       gallery: results[3] as List<GalleryItem>,
+      news: results[4] as List<NewsItem>,
     );
   }
 }

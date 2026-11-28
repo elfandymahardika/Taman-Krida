@@ -5,13 +5,14 @@ import '../../../core/theme/app_text_styles.dart';
 import '../../controllers/controllers.dart';
 import '../../widgets/common/load_status.dart';
 import '../../../domain/entities/gallery_item.dart';
-import '../../widgets/common/app_feedback.dart';
 import '../../widgets/common/artwork_image.dart';
 import '../../widgets/common/pill_badge.dart';
 import '../../widgets/interactive/segmented_tabs.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
 import '../../widgets/common/video_preview.dart';
+import '../../routes/app_routes.dart';
+import '../education/video_player_screen.dart';
 
 /// Detail koleksi galeri: tab Foto (node 157:1895) dan Video (157:1959).
 class GalleryDetailScreen extends StatefulWidget {
@@ -56,7 +57,9 @@ class _GalleryDetailScreenState extends State<GalleryDetailScreen> {
     }
     final item = found;
     final meta = _isVideo
-        ? 'Video · ${item.videoMinutes} menit · ${item.venue} · ${item.period}'
+        ? item.videos.isEmpty
+              ? 'Belum ada video · ${item.venue} · ${item.period}'
+              : '${item.videos.length} video · ${item.venue} · ${item.period}'
         : 'Foto · ${item.photos.length} gambar · ${item.venue} · ${item.period}';
 
     return TkbjScaffold(
@@ -77,14 +80,31 @@ class _GalleryDetailScreenState extends State<GalleryDetailScreen> {
               SizedBox(
                 height: 260,
                 child: _isVideo
-                    ? VideoPreview(
-                        cover: item.cover,
-                        minutes: item.videoMinutes,
-                        onPlay: () => showAppToast(
-                          context,
-                          'Pemutar video (simulasi prototype).',
-                        ),
-                      )
+                    ? item.videos.isEmpty
+                          ? Center(
+                              child: Text(
+                                'Koleksi ini belum punya video.',
+                                style: AppText.poppins(
+                                  13,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                            )
+                          // Video unggahan admin di menu Galeri dashboard.
+                          : VideoPreview(
+                              cover: item.cover,
+                              minutes: item.videoMinutes,
+                              caption: item.videos.length > 1
+                                  ? 'Putar video (1 dari ${item.videos.length})'
+                                  : 'Putar video dokumentasi',
+                              onPlay: () => Navigator.of(context).pushNamed(
+                                AppRoutes.videoPlayer,
+                                arguments: VideoArgs(
+                                  url: item.videos.first,
+                                  title: item.title,
+                                ),
+                              ),
+                            )
                     : ArtworkImage(
                         item.photos[_index],
                         radius: 12,

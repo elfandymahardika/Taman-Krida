@@ -1350,6 +1350,8 @@ select.field__control {
 .modal__row-value {
   font-weight: 600;
   text-align: right;
+  /* Nilai multi-baris (mis. daftar pesanan terbaru) dipisah "\n". */
+  white-space: pre-line;
 }
 
 .modal__actions {
@@ -2477,41 +2479,6 @@ select.field__control {
   max-width: 520px;
 }
 
-/* ---------- Rancangan AI ---------- */
-
-.ai-plan {
-  border: 1px dashed #d8b7b7;
-  background: linear-gradient(180deg, #fff, var(--c-primary-soft));
-  border-radius: var(--r-md);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.ai-plan__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 600;
-  font-size: 12px;
-  color: var(--c-primary);
-}
-
-.ai-plan__head svg {
-  width: 16px;
-  height: 16px;
-}
-
-.ai-plan ul {
-  margin: 0;
-  padding-left: 18px;
-  color: var(--c-muted);
-}
-
-
 /* ---------- Grafik penjualan & pembelian ---------- */
 
 .chart-card .section-head {
@@ -2896,7 +2863,6 @@ select.field__control {
   }
 
   .global-search,
-  .topbar .data-flag,
   .account__id,
   .account > svg,
   .topbar__sep {
@@ -2941,10 +2907,6 @@ select.field__control {
   .agenda-item .photo {
     display: none;
   }
-}
-
-.ai-plan .badge {
-  align-self: flex-start;
 }
 
 /* ==========================================================================
@@ -3785,4 +3747,67 @@ select.field__control {
   .notes {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ---------- Edukasi budaya ---------- */
+
+.edu-card {
+  cursor: pointer;
+}
+
+.edu-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: auto;
+}
+
+/* Foto bawaan aplikasi yang tidak punya pratinjau di dashboard, atau materi tanpa foto. */
+.edu-photo-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  border: 1px dashed var(--c-border);
+  border-radius: 6px;
+  background: var(--c-neutral-soft);
+  color: var(--c-muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.edu-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 14px;
+}
+
+.edu-photos__item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+}
+
+.edu-video {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  max-height: 360px;
+  border-radius: var(--r-md);
+  background: #000;
+}
+
+.pill--static {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+
+.pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

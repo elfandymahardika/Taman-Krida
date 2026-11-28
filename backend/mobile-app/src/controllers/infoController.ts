@@ -9,6 +9,7 @@ import {
 } from '../lib/catalog';
 import { notFound, queryText, where } from '../lib/http';
 import { getSettings, maxTickets, payDeadlineHours, readKv } from '../models/adminModel';
+import { findPublishedCultureTopic, listPublishedCultureTopics, toCultureTopic } from '../models/cultureModel';
 import { listPublishedEvents, toEvent } from '../models/eventModel';
 import {
   findHeroBanner,
@@ -34,6 +35,8 @@ export const getMeta = async (_req: Request, res: Response) => {
     paymentMethods: PAYMENT_METHODS,
     tickets: { maxPerEvent: maxTickets(settings), payDeadlineHours: payDeadlineHours(settings), cancelPolicy: settings.cancelPolicy },
     bankAccount: { bank: settings.bank, account: settings.account },
+    // Profil lembaga (menu Profil di dashboard): alamat, telepon, jam layanan, deskripsi.
+    profile: await readProfile(),
   });
 };
 
@@ -97,4 +100,15 @@ export const getContent = async (req: Request<{ id: string }>, res: Response) =>
   const content = await findPublishedContent(req.params.id);
   if (!content) throw notFound('Konten');
   res.json(toContent(content));
+};
+
+/** Materi Edukasi Budaya terpublikasi (dikelola admin di dashboard → Edukasi). */
+export const getCultureTopics = async (_req: Request, res: Response) => {
+  res.json((await listPublishedCultureTopics()).map(toCultureTopic));
+};
+
+export const getCultureTopic = async (req: Request<{ id: string }>, res: Response) => {
+  const topic = await findPublishedCultureTopic(req.params.id);
+  if (!topic) throw notFound('Materi edukasi');
+  res.json(toCultureTopic(topic));
 };

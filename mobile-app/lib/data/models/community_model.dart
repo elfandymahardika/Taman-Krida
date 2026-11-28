@@ -24,6 +24,11 @@ class CommunityModel extends Community {
   });
 
   factory CommunityModel.fromJson(Json j) {
+    String? text(String key) {
+      final value = (j[key] as String?)?.trim();
+      return value == null || value.isEmpty ? null : value;
+    }
+
     final since = j['since'] as String?;
     final city = j['city'] as String;
     final category = j['category'] as String;
@@ -39,14 +44,19 @@ class CommunityModel extends Community {
       foundedYear:
           int.tryParse(RegExp(r'\d{4}').stringMatch(since ?? '') ?? '') ?? 0,
       members: j['members'] as int,
-      performances: '–',
+      // Profil, jadwal latihan, dan jumlah pentas diisi admin di dashboard.
+      performances: text('performances') ?? '–',
       about:
+          text('description') ??
           '${j['name']} adalah komunitas $category dari $city yang terdaftar '
-          'di direktori Taman Krida Budaya Jawa Timur.',
-      schedule: const [],
-      place: city,
-      leader: j['leader'] as String? ?? '–',
-      address: city,
+              'di direktori Taman Krida Budaya Jawa Timur.',
+      schedule: [
+        for (final s in (j['schedule'] as List? ?? const []).cast<Json>())
+          (s['day'] as String, s['time'] as String),
+      ],
+      place: text('address') ?? city,
+      leader: text('leader') ?? '–',
+      address: text('address') ?? city,
     );
   }
 }

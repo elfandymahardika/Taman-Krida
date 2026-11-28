@@ -28,7 +28,7 @@ export default function Hero() {
     <>
       <PageHeader
         title="Konten"
-        subtitle="Kelola banner beranda, berita, pengumuman, dan artikel budaya untuk aplikasi publik."
+        subtitle="Kelola banner beranda, berita, pengumuman, dan artikel budaya. Konten Terpublikasi tampil di Beranda aplikasi mobile."
         actions={
           <BolehUbah module="info">
             <button className="btn btn--primary" onClick={addContent}>

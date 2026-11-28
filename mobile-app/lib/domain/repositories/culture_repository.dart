@@ -1,9 +1,7 @@
 import '../entities/culture_topic.dart';
 
-/// Kontrak materi Edukasi Budaya (konten bawaan aplikasi).
+/// Kontrak materi Edukasi Budaya (dikelola admin, dibaca dari server).
 abstract interface class CultureRepository {
-  List<CultureTopic> getTopics();
-
-  /// Kategori untuk chip filter, "Semua" di urutan pertama.
-  List<String> getCategories();
+  /// Materi terpublikasi sesuai urutan tampil.
+  Future<List<CultureTopic>> getTopics();
 }

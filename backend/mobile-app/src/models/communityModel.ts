@@ -19,6 +19,11 @@ export interface Community {
   since: string | null;
   admin_note: string | null;
   applied_at: string | null;
+  description: string | null;
+  address: string | null;
+  /** Baris "hari | jam". */
+  schedule: string | null;
+  performances: string | null;
 }
 
 interface CommunityRow extends RowDataPacket, Community {}
@@ -34,6 +39,15 @@ export const toCommunity = (c: Community) => ({
   photo: c.photo ?? undefined,
   leader: c.leader ?? undefined,
   since: c.since ?? undefined,
+  description: c.description ?? undefined,
+  address: c.address ?? undefined,
+  /** Jadwal latihan rutin: [{ day, time }] dari baris "hari | jam" yang diisi admin. */
+  schedule: (c.schedule ?? '')
+    .split(String.fromCharCode(10))
+    .map((line) => line.split('|').map((p) => p.trim()))
+    .filter(([day, time]) => day && time)
+    .map(([day, time]) => ({ day, time })),
+  performances: c.performances ?? undefined,
 });
 
 /** Komunitas aktif di direktori dengan filter tambahan (klausa dari helper `where()`). */

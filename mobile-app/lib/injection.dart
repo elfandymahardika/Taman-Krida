@@ -1,5 +1,4 @@
 import 'data/datasources/demo/demo_data_source.dart';
-import 'data/datasources/local/culture_local_data_source.dart';
 import 'data/datasources/local/file_picker_data_source.dart';
 import 'data/datasources/local/session_local_data_source.dart';
 import 'data/datasources/remote/api_client.dart';
@@ -7,6 +6,7 @@ import 'data/datasources/remote/assistant_remote_data_source.dart';
 import 'data/datasources/remote/auth_remote_data_source.dart';
 import 'data/datasources/remote/catalog_remote_data_source.dart';
 import 'data/datasources/remote/community_remote_data_source.dart';
+import 'data/datasources/remote/culture_remote_data_source.dart';
 import 'data/datasources/remote/facility_cache.dart';
 import 'data/datasources/remote/notification_remote_data_source.dart';
 import 'data/datasources/remote/rental_remote_data_source.dart';
@@ -47,6 +47,7 @@ class AppContainer {
     required TicketRemoteDataSource ticketSource,
     required RentalRemoteDataSource rentalSource,
     required CommunityRemoteDataSource communitySource,
+    required CultureRemoteDataSource cultureSource,
     required NotificationRemoteDataSource notificationSource,
     required AssistantRemoteDataSource assistantSource,
     required SessionLocalDataSource sessionSource,
@@ -61,7 +62,7 @@ class AppContainer {
     final communityRepo = CommunityRepositoryImpl(communitySource);
     final notificationRepo = NotificationRepositoryImpl(notificationSource);
     final assistantRepo = AssistantRepositoryImpl(assistantSource);
-    const cultureRepo = CultureRepositoryImpl(CultureLocalDataSourceImpl());
+    final cultureRepo = CultureRepositoryImpl(cultureSource);
     final fileRepo = FileRepositoryImpl(
       FilePickerDataSourceImpl(pickFile ?? pickWithSystemPicker),
     );
@@ -114,8 +115,7 @@ class AppContainer {
       askAssistant: AskAssistantUseCase(assistantRepo),
     );
     education = EducationController(
-      getTopics: const GetCultureTopicsUseCase(cultureRepo),
-      getCategories: const GetCultureCategoriesUseCase(cultureRepo),
+      getTopics: GetCultureTopicsUseCase(cultureRepo),
     );
     upload = UploadController(pickFile: PickFileUseCase(fileRepo));
   }
@@ -137,6 +137,7 @@ class AppContainer {
       ticketSource: TicketRemoteDataSourceImpl(api),
       rentalSource: RentalRemoteDataSourceImpl(api, facilities),
       communitySource: CommunityRemoteDataSourceImpl(api),
+      cultureSource: CultureRemoteDataSourceImpl(api),
       notificationSource: NotificationRemoteDataSourceImpl(api),
       assistantSource: AssistantRemoteDataSourceImpl(api),
       sessionSource: SessionLocalDataSourceImpl(),
@@ -154,6 +155,7 @@ class AppContainer {
       ticketSource: demo,
       rentalSource: demo,
       communitySource: demo,
+      cultureSource: demo,
       notificationSource: demo,
       assistantSource: demo,
       sessionSource: InMemorySessionLocalDataSource(),
@@ -175,9 +177,10 @@ class AppContainer {
 
   Future<void>? _init;
 
-  /// Muat data publik lalu pulihkan sesi login. Aman dipanggil berulang.
+  /// Muat data publik (katalog & materi edukasi) lalu pulihkan sesi login.
+  /// Aman dipanggil berulang.
   Future<void> init() => _init ??= () async {
-    await catalog.load();
+    await Future.wait([catalog.load(), education.load()]);
     await auth.restoreSession();
   }();
 }

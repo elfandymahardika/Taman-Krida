@@ -17,6 +17,12 @@ export interface Community {
   since: string | null;
   admin_note: string | null;
   applied_at: string | null;
+  /** Profil di aplikasi (diatur admin; deskripsi & alamat awal dari formulir pendaftaran). */
+  description: string | null;
+  address: string | null;
+  /** Jadwal latihan, satu baris "hari | jam". */
+  schedule: string | null;
+  performances: string | null;
 }
 
 export interface CommunityRow extends RowDataPacket, Community {}
@@ -34,6 +40,10 @@ export const toCommunity = (r: Community) => ({
   since: r.since ?? undefined,
   adminNote: r.admin_note ?? undefined,
   appliedAt: iso(r.applied_at),
+  description: r.description ?? '',
+  address: r.address ?? '',
+  schedule: r.schedule ?? '',
+  performances: r.performances ?? '',
 });
 
 export const findCommunityById = async (id: string): Promise<Community | null> => {
@@ -46,8 +56,8 @@ export const listCommunities = async () => {
   return rows;
 };
 
-export const communityNameTaken = async (name: string) => {
-  const [rows] = await pool.execute<RowDataPacket[]>('SELECT 1 FROM communities WHERE LOWER(name) = LOWER(?) LIMIT 1', [name]);
+export const communityNameTaken = async (name: string, excludeId = '') => {
+  const [rows] = await pool.execute<RowDataPacket[]>('SELECT 1 FROM communities WHERE LOWER(name) = LOWER(?) AND id != ? LIMIT 1', [name, excludeId]);
   return rows.length > 0;
 };
 
@@ -65,6 +75,29 @@ export const createCommunity = async (c: {
     `INSERT INTO communities (id, name, category, city, members, contact, photo, status, admin_note)
      VALUES (?, ?, ?, ?, ?, ?, 'topeng', 'Aktif', ?)`,
     [c.id, c.name, c.category, c.city, c.members, c.contact, c.note],
+  );
+};
+
+/** Data komunitas yang tampil di direktori aplikasi (Edit komunitas di dashboard). */
+export type CommunityProfile = {
+  name: string;
+  category: string;
+  city: string;
+  members: number;
+  contact: string;
+  leader: string | null;
+  since: string | null;
+  description: string | null;
+  address: string | null;
+  schedule: string | null;
+  performances: string | null;
+};
+
+export const updateCommunityProfile = async (id: string, c: CommunityProfile) => {
+  await pool.execute(
+    `UPDATE communities SET name = ?, category = ?, city = ?, members = ?, contact = ?, leader = ?, since = ?,
+       description = ?, address = ?, schedule = ?, performances = ? WHERE id = ?`,
+    [c.name, c.category, c.city, c.members, c.contact, c.leader, c.since, c.description, c.address, c.schedule, c.performances, id],
   );
 };
 

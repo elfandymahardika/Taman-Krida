@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../controllers/controllers.dart';
 import '../../../domain/entities/facility.dart';
+import '../../widgets/common/info_row.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/responsive_grid.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
@@ -21,7 +22,10 @@ class ProfileMapScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final facilities = context.watch<CatalogController>().facilities;
+    final catalog = context.watch<CatalogController>();
+    final facilities = catalog.facilities;
+    // Profil lembaga diatur admin di dashboard (Profil & denah).
+    final profile = catalog.profile;
 
     return TkbjScaffold(
       title: 'Profil & Denah TKBJ',
@@ -45,7 +49,7 @@ class ProfileMapScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                '*Peta interaktif menunjukkan titik lokasi fasilitas budaya TKBJ.',
+                '*Peta © OpenStreetMap. Geser/cubit untuk menjelajah, ketuk pin untuk detail fasilitas.',
                 style: AppText.poppins(
                   11,
                   color: AppColors.muted,
@@ -80,20 +84,25 @@ class ProfileMapScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Taman Krida Budaya Jawa Timur berdiri di Jl. Soekarno Hatta '
-                'No. 7, Jatimulyo, Lowokwaru, Kota Malang, di atas lahan '
-                '17.050 m² dengan bangunan 4.103 m². Dikelola UPT LPPK Taman '
-                'Krida Budaya di bawah Disbudpar Jatim, kompleks bergerbang '
-                'candi ini menjadi tempat pentas wayang, ketoprak, sendratari, '
-                'reog, jaranan, bantengan, dan pameran seni. Sejak Februari '
-                '2025, Disbudpar Jatim menggelar pagelaran rutin Topeng Panji '
-                'di sini secara gratis.',
+                profile.about,
                 style: AppText.poppins(
                   13,
                   color: AppColors.muted,
                   height: 22 / 13,
                 ),
               ),
+              const SizedBox(height: 16),
+              InfoRow(label: 'Alamat', value: profile.address),
+              const SizedBox(height: 8),
+              InfoRow(label: 'Jam layanan', value: profile.hours),
+              const SizedBox(height: 8),
+              InfoRow(label: 'Telepon', value: profile.phone),
+              if (profile.whatsapp.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                InfoRow(label: 'WhatsApp', value: profile.whatsapp),
+              ],
+              const SizedBox(height: 8),
+              InfoRow(label: 'Pengelola', value: profile.manager),
             ],
           ),
         ),

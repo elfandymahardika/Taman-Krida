@@ -118,7 +118,7 @@ export const EVENTS = [
   { id: 'hari-wayang', name: 'Pagelaran Wayang Hari Wayang Nasional', short: 'Hari Wayang Nasional', organizer: 'Disbudpar Provinsi Jawa Timur', date: '2026-11-07', start: '19:00', end: '23:00', venue: 'Pendopo Agung TKBJ', status: 'Terpublikasi', photo: 'wayang' },
 ].map((e) => ({ price: e.quota !== undefined ? PRICE : null, ...e }))
 
-/** Tarif sewa per hari, dipakai saat permintaan sewa disetujui. */
+/** Tarif sewa awal per pemakaian (data contoh). Tarif yang berlaku = kolom facilities.rental_rate, diatur di Profil & denah. */
 export const RENTAL_RATES: Record<string, number> = {
   'Pendopo Agung TKBJ': 2500000,
   'Panggung Terbuka': 2000000,

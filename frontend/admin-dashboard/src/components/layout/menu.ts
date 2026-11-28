@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Building2,
   CalendarDays,
   CreditCard,
@@ -9,6 +10,7 @@ import {
   Map,
   Settings,
   ShieldCheck,
+  Smartphone,
   StickyNote,
   Ticket,
   Users,
@@ -39,6 +41,7 @@ export const NAV: { group: string | null; items: MenuItem[] }[] = [
       { to: '/galeri', label: 'Virtual galeri', icon: Images },
       { to: '/komunitas', label: 'Direktori komunitas', icon: Users },
       { to: '/konten', label: 'Konten', icon: FileText },
+      { to: '/edukasi', label: 'Edukasi budaya', icon: BookOpen },
     ],
   },
   {
@@ -53,6 +56,7 @@ export const NAV: { group: string | null; items: MenuItem[] }[] = [
     group: 'Administrasi',
     items: [
       { to: '/pengguna', label: 'Pengguna & peran admin', icon: ShieldCheck },
+      { to: '/pengunjung', label: 'Akun pengunjung', icon: Smartphone },
       { to: '/pengaturan', label: 'Pengaturan', icon: Settings },
     ],
   },

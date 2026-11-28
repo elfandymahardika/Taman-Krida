@@ -34,6 +34,17 @@ class AuthController extends ChangeNotifier {
   /// Sedang memuat tiket, sewa, komunitas, dan notifikasi milik akun.
   bool accountLoading = false;
 
+  /// Alasan sesi diakhiri server (mis. akun dinonaktifkan admin), ditampilkan
+  /// sekali di layar Masuk.
+  String? _signedOutNotice;
+
+  /// Ambil (lalu lupakan) alasan sesi berakhir.
+  String? takeSignedOutNotice() {
+    final notice = _signedOutNotice;
+    _signedOutNotice = null;
+    return notice;
+  }
+
   /// Pulihkan sesi login sebelumnya (token tersimpan).
   Future<void> restoreSession() async {
     try {
@@ -109,7 +120,15 @@ class AuthController extends ChangeNotifier {
       await Future.wait([for (final vm in _accountData) vm.load()]);
     } on Failure catch (e) {
       if (e.isUnauthorized) {
+        // Sesi dicabut server (logout di perangkat lain, atau akun
+        // dinonaktifkan admin di dashboard): hapus token lokal juga.
+        _signedOutNotice = e.message;
         accountLoading = false;
+        try {
+          await _logout();
+        } on Failure {
+          // Token lokal tetap dihapus oleh repository.
+        }
         _clearAccount();
         return;
       }

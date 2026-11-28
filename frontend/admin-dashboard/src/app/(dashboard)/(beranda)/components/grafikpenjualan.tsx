@@ -50,7 +50,7 @@ function useWidth() {
 
 /** Perubahan rata-rata per bulan terhadap bulan-bulan sebelumnya yang tersedia. */
 function Delta({ rows, prev, seriesKey, upIsGood }) {
-  if (!prev.length) return <p className="chart-stat__delta">Data contoh dimulai Januari 2026</p>
+  if (!prev.length) return <p className="chart-stat__delta">Data dimulai Januari 2026</p>
   const avg = (list) => total(list, seriesKey) / list.length
   const pct = (avg(rows) / avg(prev) - 1) * 100
   const up = pct >= 0
@@ -118,7 +118,7 @@ export default function GrafikPenjualan() {
     ]
     overlay.showDetail({
       title: `Rincian ${d.label}`,
-      subtitle: 'Penjualan & pembelian · data contoh',
+      subtitle: 'Penjualan & pembelian',
       rows: rows.map(([label, value]) => [label, formatJuta(value)]),
       primaryLabel: 'Unduh rincian (CSV)',
       // Nilai disimpan dalam juta rupiah, sama dengan grafik.

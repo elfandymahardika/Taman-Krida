@@ -32,7 +32,7 @@ export const isCloudKey = (fileKey: string) => /^https?:\/\//.test(fileKey);
 export const blobAccess = (): 'public' | 'private' => (process.env.BLOB_ACCESS === 'public' ? 'public' : 'private');
 
 /** Folder blob yang boleh dibaca tanpa login lewat /uploads. Berkas pengunjung hanya lewat endpoint ber-auth. */
-const SERVED_BLOB_FOLDERS = ['galeri', 'documents', 'acara'];
+const SERVED_BLOB_FOLDERS = ['galeri', 'documents', 'acara', 'edukasi'];
 
 /**
  * URL tampil sebuah berkas: berkas lokal di /uploads/<nama>; blob publik = URL blob apa adanya;

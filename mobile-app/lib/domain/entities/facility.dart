@@ -22,7 +22,7 @@ class Facility {
   final String capacityLabel;
   final String imageAsset;
 
-  /// Posisi pin pada peta denah, relatif terhadap lebar & tinggi peta (0–1).
+  /// Titik lokasi fasilitas di peta (koordinat GPS).
   /// `null` untuk area baru dari admin yang belum punya titik di denah.
   final MapPoint? mapPosition;
 
@@ -39,11 +39,11 @@ class Facility {
   bool get isRentable => rentalRate != null;
 }
 
-/// Titik pada denah, relatif terhadap lebar ([x]) & tinggi ([y]) peta (0–1).
-/// Dart murni agar entity tidak bergantung pada `dart:ui`.
+/// Koordinat GPS ([latitude], [longitude]) sebuah titik di peta.
+/// Dart murni agar entity tidak bergantung pada paket peta.
 class MapPoint {
-  const MapPoint(this.x, this.y);
+  const MapPoint(this.latitude, this.longitude);
 
-  final double x;
-  final double y;
+  final double latitude;
+  final double longitude;
 }

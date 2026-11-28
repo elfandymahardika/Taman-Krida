@@ -1,15 +1,13 @@
 import '../../domain/entities/culture_topic.dart';
 import '../../domain/repositories/culture_repository.dart';
-import '../datasources/local/culture_local_data_source.dart';
+import '../datasources/remote/culture_remote_data_source.dart';
+import 'guard.dart';
 
 class CultureRepositoryImpl implements CultureRepository {
-  const CultureRepositoryImpl(this._local);
+  const CultureRepositoryImpl(this._remote);
 
-  final CultureLocalDataSource _local;
-
-  @override
-  List<CultureTopic> getTopics() => _local.topics();
+  final CultureRemoteDataSource _remote;
 
   @override
-  List<String> getCategories() => _local.categories();
+  Future<List<CultureTopic>> getTopics() => guard(_remote.cultureTopics);
 }

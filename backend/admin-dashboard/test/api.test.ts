@@ -371,6 +371,28 @@ describe('profil & fasilitas', () => {
     assert.equal(created.status, 201)
     assert.equal(created.body.bookable, false)
   })
+
+  test('tarif sewa diatur di fasilitas dan dipakai saat sewa disetujui', async () => {
+    const token = await login('admin', 'admin123')
+    const panggung = (await call('/facilities', { token })).body.find((f) => f.id === 'panggung')
+    assert.equal(panggung.rentalRate, 2000000, 'tarif awal dari migration/seeder')
+    const bad = await call('/facilities/panggung', { token, method: 'PUT', body: { ...panggung, rentalRate: -5 } })
+    assert.ok(bad.body.fields.rentalRate)
+    const ok = await call('/facilities/panggung', { token, method: 'PUT', body: { ...panggung, rentalRate: '2250000' } })
+    assert.equal(ok.body.rentalRate, 2250000)
+
+    const rental = await call('/rentals', {
+      token,
+      method: 'POST',
+      body: { applicant: 'Uji Tarif', venue: 'Panggung Terbuka', date: '2026-12-28', start: '08:00', end: '12:00', activity: 'Uji tarif sewa' },
+    })
+    assert.equal(rental.status, 201)
+    assert.equal(rental.body.amount, 2250000, 'perkiraan tagihan mengikuti tarif baru')
+    await call(`/rentals/${rental.body.id}/approve`, { token, method: 'POST' })
+    const invoice = await queryOne('SELECT amount FROM orders WHERE rental_id = ?', [rental.body.id])
+    assert.equal(Number(invoice.amount), 2250000)
+    await call('/facilities/panggung', { token, method: 'PUT', body: { ...panggung } })
+  })
 })
 
 describe('galeri', () => {
@@ -413,6 +435,204 @@ describe('konten', () => {
     const ok = await call(`/contents/${hero.id}`, { token, method: 'PUT', body: { title: 'Pekan Ketoprak di TKBJ', status: 'Terjadwal' } })
     assert.equal(ok.body.title, 'Pekan Ketoprak di TKBJ')
     assert.equal(ok.body.status, 'Terjadwal')
+  })
+})
+
+describe('edukasi budaya', () => {
+  const materi = {
+    title: 'Tari Remo',
+    category: 'Tari',
+    status: 'Draf',
+    readMinutes: 6,
+    summary: 'Tari penyambutan khas Jawa Timur.',
+    headline: 'Tari pembuka pertunjukan ludruk yang gagah.',
+    history: 'Tari Remo berasal dari Jombang dan menjadi pembuka ludruk.',
+    timelineTitle: 'Linimasa',
+    videoMinutes: 0,
+    timeline: [{ label: '1950', text: 'Mulai dipentaskan sebagai pembuka ludruk.' }],
+    philosophy: [{ symbol: '', title: 'Gerak kaki', text: 'Melambangkan keberanian.' }],
+  }
+
+  test('materi awal dari migration, validasi, tambah, terbitkan, hak akses', async () => {
+    const token = await login('admin', 'admin123')
+    const list = (await call('/culture', { token })).body
+    assert.deepEqual(
+      list.map((c) => c.id),
+      ['wayang-kulit', 'tari-topeng-malangan', 'ketoprak', 'gamelan', 'jaranan-reog', 'arsitektur-joglo'],
+    )
+    assert.deepEqual(list[0].images[0], { key: 'wayang', builtin: 'wayang' })
+    assert.match(list[0].timeline.map((p) => p.text).join(' '), /UNESCO/)
+
+    const bad = await call('/culture', {
+      token,
+      method: 'POST',
+      body: { ...materi, title: 'X', readMinutes: 0, timeline: [{ label: '', text: 'a' }], philosophy: 'bukan array' },
+    })
+    assert.equal(bad.status, 400)
+    assert.deepEqual(Object.keys(bad.body.fields).sort(), ['philosophy', 'readMinutes', 'timeline', 'title'])
+
+    const created = await call('/culture', { token, method: 'POST', body: materi })
+    assert.equal(created.status, 201)
+    assert.equal(created.body.id, 'tari-remo')
+    assert.equal(created.body.author, 'Admin Pusat')
+    assert.equal(created.body.philosophy[0].symbol, '◆', 'simbol kosong diganti simbol bawaan')
+    assert.deepEqual(created.body.images, [])
+    // Judul sama → id unik baru.
+    assert.equal((await call('/culture', { token, method: 'POST', body: materi })).body.id, 'tari-remo-2')
+
+    const edited = await call('/culture/tari-remo', { token, method: 'PUT', body: { ...materi, title: 'Tari Remo Jombangan' } })
+    assert.equal(edited.body.title, 'Tari Remo Jombangan')
+    assert.equal(edited.body.id, 'tari-remo', 'id tetap walau judul berubah')
+    const published = await call('/culture/tari-remo', { token, method: 'PATCH', body: { status: 'Terpublikasi' } })
+    assert.equal(published.body.status, 'Terpublikasi')
+
+    const konten = await login('siti.rahma', 'tkbj2026')
+    assert.equal((await call('/culture', { token: konten })).status, 200)
+    const keuangan = await login('keuangan', 'keuangan123')
+    assert.equal((await call('/culture/tari-remo', { token: keuangan, method: 'PATCH', body: { status: 'Draf' } })).status, 403)
+    assert.ok((await call('/search?q=remo', { token })).body.results.some((r) => r.type === 'Edukasi' && r.href === '/edukasi'))
+
+    assert.equal((await call('/culture/tari-remo-2', { token, method: 'DELETE' })).status, 204)
+    assert.equal((await call('/culture/tari-remo-2', { token, method: 'PATCH', body: { status: 'Draf' } })).status, 404)
+  })
+
+  test('foto: unggah, jadikan sampul, urutan hanya dari foto materi, hapus ikut menghapus berkas', async () => {
+    const token = await login('admin', 'admin123')
+    const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex')
+    const files = () => (fs.existsSync(uploadsDir) ? fs.readdirSync(uploadsDir) : [])
+    const before = files().length
+
+    const fake = await call('/culture/gamelan/images', { token, method: 'POST', raw: Buffer.from('bukan gambar'), type: 'image/png' })
+    assert.equal(fake.status, 400, 'isi berkas dicek, bukan hanya Content-Type')
+
+    const up = await call('/culture/gamelan/images?name=gamelan-asli.png', { token, method: 'POST', raw: PNG, type: 'image/png' })
+    assert.equal(up.status, 200)
+    const uploaded = up.body.images.at(-1)
+    assert.match(uploaded.url, /^\/uploads\/.+gamelan-asli\.png$/)
+    assert.equal(files().length, before + 1)
+
+    const cover = await call('/culture/gamelan/images?name=sampul.png&cover=1', { token, method: 'POST', raw: PNG, type: 'image/png' })
+    assert.match(cover.body.images[0].url, /sampul\.png$/, 'cover=1 → foto baru jadi sampul')
+
+    const foreign = await call('/culture/gamelan', { token, method: 'PATCH', body: { images: ['wayang', 'https://contoh.test/a.png'] } })
+    assert.equal(foreign.status, 400)
+
+    // Lepas foto bawaan "gedung" dan unggahan pertama; berkasnya ikut terhapus, foto bawaan tidak.
+    const keep = cover.body.images.map((i) => i.key).filter((k) => k !== 'gedung' && k !== uploaded.key)
+    const reordered = await call('/culture/gamelan', { token, method: 'PATCH', body: { images: keep } })
+    assert.deepEqual(reordered.body.images.map((i) => i.key), keep)
+    assert.equal(files().length, before + 1)
+
+    for (let i = keep.length; i < 8; i++) await call('/culture/gamelan/images', { token, method: 'POST', raw: PNG, type: 'image/png' })
+    const full = await call('/culture/gamelan/images', { token, method: 'POST', raw: PNG, type: 'image/png' })
+    assert.equal(full.status, 400, 'maksimal 8 foto')
+
+    const uploadedCount = (await call('/culture', { token })).body.find((c) => c.id === 'gamelan').images.filter((i) => i.url).length
+    assert.equal(files().length, before + uploadedCount)
+    assert.equal((await call('/culture/gamelan', { token, method: 'DELETE' })).status, 204)
+    assert.equal(files().length, before, 'berkas unggahan ikut terhapus bersama materinya')
+  })
+
+  test('video: tautan atau berkas (saling menggantikan), validasi, hapus ikut menghapus berkas', async () => {
+    const token = await login('admin', 'admin123')
+    const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypmp42'), Buffer.alloc(16)])
+    const files = () => (fs.existsSync(uploadsDir) ? fs.readdirSync(uploadsDir) : [])
+    const before = files().length
+    assert.equal((await call('/culture', { token })).body.find((c) => c.id === 'ketoprak').video, null)
+
+    const http = await call('/culture/ketoprak/video', { token, method: 'PUT', body: { link: 'http://contoh.test/a.mp4' } })
+    assert.equal(http.status, 400)
+    assert.ok(http.body.fields.videoLink)
+    const link = await call('/culture/ketoprak/video', { token, method: 'PUT', body: { link: 'https://www.youtube.com/watch?v=abc' } })
+    assert.deepEqual(link.body.video, { kind: 'link', url: 'https://www.youtube.com/watch?v=abc' })
+
+    const fake = await call('/culture/ketoprak/video', { token, method: 'POST', raw: Buffer.from('bukan video sama sekali'), type: 'video/mp4' })
+    assert.equal(fake.status, 400, 'isi berkas dicek, bukan hanya Content-Type')
+    assert.equal((await call('/culture/ketoprak/video', { token, method: 'POST', raw: MP4, type: 'video/x-msvideo' })).status, 415)
+
+    const up = await call('/culture/ketoprak/video?name=ketoprak.mp4', { token, method: 'POST', raw: MP4, type: 'video/mp4' })
+    assert.equal(up.status, 200)
+    assert.equal(up.body.video.kind, 'file', 'berkas menggantikan tautan')
+    assert.match(up.body.video.url, /^\/uploads\/.+ketoprak\.mp4$/)
+    assert.equal(files().length, before + 1)
+
+    // Tautan menggantikan berkas: berkas lama dihapus dari penyimpanan.
+    await call('/culture/ketoprak/video', { token, method: 'PUT', body: { link: 'https://cdn.contoh.test/ketoprak.webm' } })
+    assert.equal(files().length, before)
+    await call('/culture/ketoprak/video?name=lagi.mp4', { token, method: 'POST', raw: MP4, type: 'video/mp4' })
+    const removed = await call('/culture/ketoprak/video', { token, method: 'DELETE' })
+    assert.equal(removed.body.video, null)
+    assert.equal(files().length, before)
+  })
+})
+
+describe('kategori acara & data komunitas untuk aplikasi', () => {
+  test('kategori acara dipilih admin (kosong = otomatis)', async () => {
+    const token = await login('admin', 'admin123')
+    const body = { name: 'Uji Kategori Acara', organizer: 'Tim Uji', date: '2026-12-20', start: '19:00', end: '21:00', venue: 'Pendopo Agung TKBJ' }
+    const bad = await call('/events', { token, method: 'POST', body: { ...body, category: 'Sulap' } })
+    assert.ok(bad.body.fields.category)
+    const created = await call('/events', { token, method: 'POST', body: { ...body, category: 'Musik' } })
+    assert.equal(created.body.category, 'Musik')
+    const cleared = await call(`/events/${created.body.id}`, { token, method: 'PUT', body: { ...body, category: '' } })
+    assert.equal(cleared.body.category, undefined)
+    await call(`/events/${created.body.id}`, { token, method: 'DELETE' })
+  })
+
+  test('edit komunitas: profil, jadwal latihan, jumlah pentas; validasi & hak akses', async () => {
+    const token = await login('admin', 'admin123')
+    const c = (await call('/communities', { token })).body.find((x) => x.status === 'Aktif')
+    const bad = await call(`/communities/${c.id}`, { token, method: 'PUT', body: { ...c, category: 'Sulap', schedule: 'Sabtu jam 3' } })
+    assert.equal(bad.status, 400)
+    assert.ok(bad.body.fields.category && bad.body.fields.schedule)
+    const body = { ...c, description: 'Sanggar tari yang rutin pentas.', address: 'Jl. Contoh No. 1', schedule: 'Sabtu | 15.00–17.00\n\nMinggu | 09.00–11.00', performances: '50+ pentas', members: '30' }
+    const ok = await call(`/communities/${c.id}`, { token, method: 'PUT', body })
+    assert.equal(ok.status, 200)
+    assert.equal(ok.body.schedule, 'Sabtu | 15.00–17.00\nMinggu | 09.00–11.00', 'baris kosong dibuang')
+    assert.equal(ok.body.members, 30)
+    assert.equal(ok.body.performances, '50+ pentas')
+    const keuangan = await login('keuangan', 'keuangan123')
+    assert.equal((await call(`/communities/${c.id}`, { token: keuangan, method: 'PUT', body })).status, 403)
+  })
+})
+
+describe('akun pengunjung aplikasi', () => {
+  test('lihat, cari, rincian, nonaktifkan (wajib alasan, sesi dicabut), aktifkan kembali, hak akses', async () => {
+    const token = await login('admin', 'admin123')
+    const now = new Date()
+    await pool.execute(
+      "INSERT INTO visitors (name, email, phone, city, password_hash, created_at, updated_at) VALUES ('Rina Uji', 'rina.uji@email.com', '081234567890', 'Malang', 'x', ?, ?)",
+      [now, now],
+    )
+    const { id } = await queryOne('SELECT id FROM visitors WHERE email = ?', ['rina.uji@email.com'])
+    const future = new Date(Date.now() + 86400000)
+    await pool.execute('INSERT INTO visitor_sessions (id, visitor_id, created_at, expires_at) VALUES (?, ?, ?, ?)', ['00000000-0000-4000-8000-000000000001', id, now, future])
+
+    const list = await call('/visitors?page=1&limit=10&q=rina', { token })
+    assert.equal(list.body.pagination.total, 1)
+    const v = list.body.data[0]
+    assert.equal(v.status, 'Aktif')
+    assert.equal(v.activeSessions, 1)
+    assert.equal((await call('/visitors/stats', { token })).body.active >= 1, true)
+    assert.equal((await call(`/visitors/${id}`, { token })).body.activity.orders.length, 0)
+    assert.ok((await call('/search?q=rina', { token })).body.results.some((r) => r.type === 'Pengunjung'))
+
+    const noReason = await call(`/visitors/${id}`, { token, method: 'PATCH', body: { status: 'Nonaktif' } })
+    assert.equal(noReason.status, 400)
+    assert.ok(noReason.body.fields.note)
+    const konten = await login('siti.rahma', 'tkbj2026')
+    assert.equal((await call('/visitors', { token: konten })).status, 403, 'hanya Administrator utama')
+
+    const off = await call(`/visitors/${id}`, { token, method: 'PATCH', body: { status: 'Nonaktif', note: 'Bukti transfer palsu berulang.' } })
+    assert.equal(off.body.status, 'Nonaktif')
+    assert.equal(off.body.disabledNote, 'Bukti transfer palsu berulang.')
+    assert.equal(off.body.activeSessions, 0, 'semua sesi dicabut')
+    assert.equal((await call('/visitors?page=1&status=Nonaktif', { token })).body.data.length, 1)
+
+    const on = await call(`/visitors/${id}`, { token, method: 'PATCH', body: { status: 'Aktif' } })
+    assert.equal(on.body.status, 'Aktif')
+    assert.equal(on.body.disabledNote, undefined)
+    assert.equal((await call('/visitors/abc', { token })).status, 404)
   })
 })
 
@@ -673,7 +893,7 @@ describe('CHECK POINT 11: middleware auth, peran, dan pembatas', () => {
 
   test('Prisma: skema & migration sudah diterapkan di database test', async () => {
     const migrations = await prisma.$queryRaw<{ migration_name: string }[]>`SELECT migration_name FROM _prisma_migrations ORDER BY migration_name`
-    assert.deepEqual(migrations.map((m) => m.migration_name), ['0_init', '1_blob_file_urls', '2_event_image'])
+    assert.deepEqual(migrations.map((m) => m.migration_name), ['0_init', '1_blob_file_urls', '2_event_image', '3_culture_topics', '4_culture_video', '5_admin_managed_fields', '6_visitor_status'])
     assert.equal(await prisma.user.count(), (await call('/users', { token: await login('admin', 'admin123') })).body.length)
   })
 })

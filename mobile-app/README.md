@@ -32,7 +32,7 @@ Untuk presentasi tanpa server ada **mode demo** yang memakai data contoh di memo
 | Halaman yang menampilkan data / hasil input | Kalender & detail acara, galeri, komunitas, materi edukasi, **E-Tiket**, **Tiket Saya**, **Status Pengajuan**, **Bukti Reservasi**, **Riwayat Sewa**, **Notifikasi**, Akun Saya. Data yang diisi di form langsung muncul di halaman ini. |
 | Navigasi antarhalaman | *Bottom navigation* 5 tab (Beranda, Acara, Tiket, Jelajah, Akun) dengan badge keranjang & notifikasi, app bar dengan tombol kembali, 32 rute bernama (`lib/presentation/routes/app_routes.dart`), rute akun yang dilindungi login (otomatis diarahkan ke halaman Masuk). |
 | Validasi sederhana | Wajib isi, format email, nomor WhatsApp `08…` 10–13 digit, kata sandi ≥ 8 karakter dengan huruf besar, huruf kecil & angka (sama dengan server), persetujuan ketentuan, keranjang tidak boleh kosong, jumlah tiket 0–4, **tanggal/slot venue penuh**, **3 berkas sewa wajib diunggah**, kategori komunitas wajib dipilih, deskripsi ≥ 20 karakter. |
-| Data dummy | `lib/data/datasources/demo/seed/` (acara, fasilitas, galeri, komunitas, akun, pesanan, pengajuan sewa, notifikasi) dan `lib/data/datasources/local/culture_data.dart` (materi edukasi). |
+| Data dummy | `lib/data/datasources/demo/seed/` (acara, fasilitas, galeri, komunitas, akun, pesanan, pengajuan sewa, notifikasi) dan materi edukasi (`seed/culture_data.dart`, hanya mode demo & test; aplikasi sungguhan memuat materi dari server). |
 | Fitur AI | **Tanya Krida**: asisten AI (Google Gemini) yang menjelaskan TKBJ & sejarah kesenian Jawa Timur serta menjawab jadwal, tiket, sewa gedung, dan komunitas dari data server. Lihat [Fitur AI: Tanya Krida](#fitur-ai-tanya-krida). |
 
 ### Akun demo
@@ -211,7 +211,7 @@ Screenshot jawaban diambil dari mode demo (jawaban contoh). Dengan server dan `G
      - **Ditolak** → catatan admin → **Ajukan Ulang** (venue & nama kegiatan terisi otomatis).
 3. **Virtual Galeri:** filter kategori → detail dengan tab Foto (geser foto, thumbnail) dan Video.
 4. **Direktori Komunitas:** filter kategori → detail sanggar (statistik, jadwal latihan, kontak) → *Hubungi via WhatsApp*; atau **Daftarkan Komunitas** → *Pendaftaran terkirim* → notifikasi baru.
-5. **Edukasi Budaya:** 6 materi → detail dengan tab **Sejarah** (linimasa), **Filosofi**, dan **Foto/Video**.
+5. **Edukasi Budaya:** materi dari dashboard (menu **Edukasi budaya**; awalnya 6 materi) → detail dengan tab **Sejarah** (linimasa), **Filosofi**, dan **Foto/Video**.
 6. **Akun:** Masuk / Daftar → Akun Saya → Tiket Saya, Riwayat Sewa (tombol sesuai status), Edit Profil, **Notifikasi** (tandai dibaca, buka halaman terkait), Keluar.
 
 Pemesanan tiket, pengajuan sewa, pendaftaran komunitas, dan setiap keputusan admin otomatis menambah notifikasi baru. Notifikasi dimuat ulang saat layar Akun, Notifikasi, Tiket Saya, Riwayat Sewa, atau status dibuka, dan bisa dimuat ulang manual dengan tombol *Muat Ulang Status*.
@@ -319,7 +319,7 @@ Page (RentalDocumentsScreen)
 | Domain | **UseCase** | `lib/domain/usecases/` | Satu aksi bisnis per kelas, mis. `LoginUseCase`, `CheckoutUseCase`, `SubmitRentalUseCase`. |
 | Domain | **Repository (kontrak)** | `lib/domain/repositories/` | *Interface* yang dibutuhkan use case. |
 | Data | **Repository (implementasi)** | `lib/data/repositories/` | Memanggil data source dan menerjemahkan `ApiException` (HTTP) menjadi `Failure` (domain). |
-| Data | **Data Source** | `lib/data/datasources/` | `remote/` (HTTP ke backend/mobile-app), `local/` (token di SharedPreferences, pemilih berkas, materi edukasi), `demo/` (server tiruan di memori untuk test & mode demo). |
+| Data | **Data Source** | `lib/data/datasources/` | `remote/` (HTTP ke backend/mobile-app), `local/` (token di SharedPreferences, pemilih berkas), `demo/` (server tiruan di memori untuk test & mode demo). |
 | Data | **Model** | `lib/data/models/` | DTO turunan entity, plus `fromJson`/`toJson`. |
 | — | **Dependency injection** | `lib/injection.dart` | `AppContainer` merakit DataSource → Repository → UseCase → Controller (`.api()` / `.demo()`). |
 
@@ -351,7 +351,7 @@ mobile-app/
 │   │   ├── models/               DTO + fromJson/toJson, Visuals (foto & posisi denah)
 │   │   ├── datasources/
 │   │   │   ├── remote/           ApiClient + RemoteDataSource per fitur (HTTP)
-│   │   │   ├── local/            token sesi, pemilih berkas, materi edukasi
+│   │   │   ├── local/            token sesi, pemilih berkas
 │   │   │   └── demo/             DemoDataSource + seed/ data contoh (test & mode demo)
 │   │   └── repositories/         implementasi kontrak domain
 │   └── presentation/
@@ -375,10 +375,12 @@ mobile-app/
 ## Catatan
 
 - Status bar dan *home indicator* pada frame Figma adalah bingkai perangkat, sehingga tidak digambar ulang; aplikasi memakai status bar asli sistem operasi.
-- **Masih simulasi:** kode QR & nomor Virtual Account (contoh; pembayaran dibuktikan lewat unggah bukti yang diverifikasi admin), tombol WhatsApp, pemutar video, dan *Lupa Kata Sandi* (belum ada layanan email). Pada **mode demo**, keputusan admin juga disimulasikan lewat tombol di layar status.
-- **Edukasi Budaya** tetap memakai materi statis di aplikasi, karena dashboard belum punya modul materi edukasi.
-- **Komunitas dari dashboard:** kategori mengikuti dashboard (*Seni tari tradisional, Seni pertunjukan, Seni musik, Seni kriya*). Jadwal latihan & jumlah pentas belum dikelola admin, jadi tampil "Hubungi pengurus" / "–". Foto kegiatan tidak diminta saat mendaftar karena server belum menyimpannya.
-- **Tarif sewa** dihitung per pemakaian (tarif yang ditagihkan dashboard saat sewa disetujui), bukan per jam.
+- **Masih simulasi:** kode QR & nomor Virtual Account (contoh; pembayaran dibuktikan lewat unggah bukti yang diverifikasi admin), tombol WhatsApp, video Virtual Galeri, dan *Lupa Kata Sandi* (belum ada layanan email). Pada **mode demo**, keputusan admin juga disimulasikan lewat tombol di layar status.
+- **Edukasi Budaya** dikelola admin di dashboard → **Edukasi budaya** (`GET /api/culture`, hanya materi Terpublikasi). Foto materi berupa unggahan admin atau kunci foto bawaan aplikasi (`wayang`, `pendopo`, …, lihat `Visuals.photo`); foto pertama menjadi sampul. Video materi juga diatur admin: **berkas** (MP4/WEBM/MOV, atau tautan langsung `.mp4`) diputar di aplikasi lewat `video_player` (layar `VideoPlayerScreen`), sedangkan **tautan YouTube/lainnya** dibuka di aplikasi YouTube/browser lewat `url_launcher`. Materi tanpa video tidak menampilkan pemutar.
+- **Komunitas dari dashboard:** kategori mengikuti dashboard (*Seni tari tradisional, Seni pertunjukan, Seni musik, Seni kriya*). Deskripsi, alamat, jadwal latihan, dan jumlah pentas diisi admin lewat **Edit** di Direktori komunitas dashboard (deskripsi & alamat awal dari formulir pendaftaran); bila kosong tampil "Hubungi pengurus" / "–". Foto kegiatan tidak diminta saat mendaftar karena server belum menyimpannya.
+- **Tarif sewa** dihitung per pemakaian dan diatur admin per area di **Profil & denah** dashboard (kolom `facilities.rental_rate`), bukan per jam.
+- **Akun pengunjung** bisa dinonaktifkan admin (dashboard → Akun pengunjung). Aplikasi langsung keluar dari sesi pada permintaan berikutnya dan layar Masuk menampilkan alasannya.
+- **Semua isi diatur dari dashboard:** profil lembaga (alamat, telepon, jam layanan, deskripsi) lewat `/api/meta`; banner beranda & *Kabar TKBJ* (berita, pengumuman, artikel budaya) dari menu **Konten** lewat `/api/contents`, dengan halaman detail dan tombol tautan (`/agenda` → Kalender, `https://…` → browser); kategori acara dipilih di form Acara (kosong = ditebak dari nama); video di Virtual Galeri diputar di aplikasi.
 - **Foto yang belum diekspor dari Figma:** gamelan, latihan sanggar, dan jaranan. Batas akses Figma MCP (paket Starter) mencegah pengunduhan, sehingga aplikasi menampilkan sampul gradien maroon sebagai gantinya. Untuk memakai foto asli, ekspor dari Figma lalu simpan sebagai `assets/images/gamelan.png`, `assets/images/latihan-sanggar.png`, dan `assets/images/jaranan.png`; tidak perlu mengubah kode.
 - "Hari ini" mengikuti server (`APP_TODAY` di backend, bawaan 2 Oktober 2026), agar data contoh tetap relevan. Mode demo memakai 1 Juni 2026, sesuai tanggal desain.
 - Pada mode demo, data tersimpan di memori dan kembali ke data contoh saat aplikasi ditutup. Pada mode server, token login disimpan di perangkat, sehingga pengguna tetap masuk setelah aplikasi dibuka lagi.

@@ -27,6 +27,13 @@ class ArtworkImage extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget fallback(BuildContext context, Object error, StackTrace? trace) =>
         _Placeholder(width: width, height: height);
+    // Data tanpa foto (mis. materi edukasi yang belum diberi foto admin).
+    if (asset.isEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: _Placeholder(width: width, height: height),
+      );
+    }
     // Foto yang diunggah admin di dashboard berupa URL.
     final image = asset.startsWith('http')
         ? Image.network(

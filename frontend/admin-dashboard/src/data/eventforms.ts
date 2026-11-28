@@ -1,4 +1,4 @@
-import { EVENT_STATUSES, VENUES, eventStore, formatDate, pickedImage, timeRange, validateEvent, validateEventImage } from './events'
+import { AUTO_CATEGORY, EVENT_CATEGORIES, EVENT_STATUSES, VENUES, eventStore, formatDate, pickedImage, timeRange, validateEvent, validateEventImage } from './events'
 import type { Event, EventInput } from './events'
 import { rupiah, todayWib } from './format'
 import type { DetailOptions, FormOptions } from '../components/overlay'
@@ -18,6 +18,7 @@ const REMOVE_IMAGE = 'Hapus gambar'
  */
 async function saveEvent(e: Event | undefined, data: Record<string, any>) {
   const { gambar, gambarAksi, ...fields } = data
+  if (fields.category === AUTO_CATEGORY) fields.category = ''
   const saved: Event = e ? await eventStore.update(e.id, fields as EventInput) : await eventStore.add(fields as EventInput)
   const file = pickedImage(gambar)
   if (file) await eventStore.uploadImage(saved.id, file)
@@ -50,6 +51,14 @@ export const eventForm = (list: Event[], e?: Event, date = todayWib()): FormOpti
         { name: 'venue', label: 'Lokasi / fasilitas', as: 'select', options: VENUES, defaultValue: e?.venue },
         { name: 'status', label: 'Status publikasi', as: 'select', options: EVENT_STATUSES, defaultValue: e?.status ?? 'Draf' },
       ],
+    },
+    {
+      name: 'category',
+      label: 'Kategori di aplikasi',
+      as: 'select',
+      options: [AUTO_CATEGORY, ...EVENT_CATEGORIES],
+      defaultValue: e?.category || AUTO_CATEGORY,
+      hint: 'Dipakai filter Kalender Acara di aplikasi mobile.',
     },
     {
       row: [

@@ -19,6 +19,8 @@ export interface VisitorRental {
   contact: string;
   notified_status: string;
   invoice_amount: number | null;
+  /** Tarif venue saat ini (facilities.rental_rate), dipakai sebelum tagihan dibuat. */
+  venue_rate: number | null;
   invoice_payment: PaymentStatus | null;
   invoice_method: string | null;
   invoice_note: string | null;
@@ -30,10 +32,11 @@ interface VisitorRentalRow extends RowDataPacket, VisitorRental {}
 const SELECT = `
   SELECT r.*, vr.contact, vr.notified_status,
          o.amount AS invoice_amount, o.payment AS invoice_payment, COALESCE(o.method, o.proof_method) AS invoice_method,
-         o.note AS invoice_note, o.paid_at AS invoice_paid_at
+         o.note AS invoice_note, o.paid_at AS invoice_paid_at, f.rental_rate AS venue_rate
   FROM visitor_rentals vr
   JOIN rentals r ON r.id = vr.rental_id
-  LEFT JOIN orders o ON o.rental_id = r.id`;
+  LEFT JOIN orders o ON o.rental_id = r.id
+  LEFT JOIN facilities f ON f.name = r.venue`;
 
 export const listVisitorRentals = async (visitorId: number) => {
   const [rows] = await pool.execute<VisitorRentalRow[]>(`${SELECT} WHERE vr.visitor_id = ? ORDER BY r.submitted_at DESC`, [visitorId]);

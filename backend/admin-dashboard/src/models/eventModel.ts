@@ -23,6 +23,8 @@ export interface Event {
   photo: string | null;
   /** Gambar unggahan admin (nama berkas lokal atau URL Vercel Blob). */
   image: string | null;
+  /** Kategori filter Kalender aplikasi; null = ditebak dari nama acara. */
+  category: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +65,7 @@ export const toEvent = (r: Event) => ({
   photo: r.photo ?? undefined,
   /** URL gambar unggahan (relatif /uploads/... atau URL blob publik); diutamakan daripada `photo`. */
   imageUrl: r.image ? publicUrl(r.image) : undefined,
+  category: r.category ?? undefined,
   updatedAt: iso(r.updated_at),
 });
 
@@ -127,6 +130,11 @@ export const updateEvent = async (
 };
 
 /** Perubahan sebagian: status publikasi & inventori tiket. */
+/** Kategori acara pilihan admin (null = otomatis dari nama acara). */
+export const setEventCategory = async (id: string, category: string | null) => {
+  await pool.execute('UPDATE events SET category = ? WHERE id = ?', [category, id]);
+};
+
 export const updateEventInventory = async (
   id: string,
   e: { status: string; quota: number | null; sold: number | null; price: number | null },

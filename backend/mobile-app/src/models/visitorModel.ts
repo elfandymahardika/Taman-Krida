@@ -45,6 +45,18 @@ export const toVisitor = (v: Visitor) => ({
   createdAt: iso(v.created_at),
 });
 
+/** Pesan untuk akun yang dinonaktifkan admin (login & token lama ditolak). */
+export const DISABLED_MESSAGE = 'Akun Anda dinonaktifkan oleh pengelola TKBJ. Hubungi TKBJ untuk informasi lebih lanjut.';
+
+/**
+ * Status akun dari dashboard (Akun pengunjung). SQL murni agar tidak bergantung pada Prisma Client yang
+ * sudah digenerate ulang. `null` bila akun tidak ada.
+ */
+export const visitorStatus = async (id: number): Promise<{ status: 'Aktif' | 'Nonaktif'; note: string | null } | null> => {
+  const [rows] = await pool.execute<RowDataPacket[]>('SELECT status, disabled_note FROM visitors WHERE id = ? LIMIT 1', [id]);
+  return rows[0] ? { status: rows[0].status, note: rows[0].disabled_note } : null;
+};
+
 export const findVisitorById = async (id: number) => {
   const v = await prisma.visitor.findUnique({ where: { id: BigInt(id) } });
   return v ? toRow(v) : null;

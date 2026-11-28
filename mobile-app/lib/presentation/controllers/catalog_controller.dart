@@ -6,6 +6,7 @@ import '../../domain/entities/community.dart';
 import '../../domain/entities/cultural_event.dart';
 import '../../domain/entities/facility.dart';
 import '../../domain/entities/gallery_item.dart';
+import '../../domain/entities/news_item.dart';
 import '../../domain/usecases/catalog_usecases.dart';
 
 /// Keadaan pemuatan data dari server.
@@ -27,6 +28,9 @@ class CatalogController extends ChangeNotifier {
   List<Community> communities = const [];
   List<GalleryItem> gallery = const [];
 
+  /// Konten terpublikasi dari menu Konten dashboard (terbaru dulu).
+  List<NewsItem> news = const [];
+
   bool get isReady => loadState == LoadState.ready;
 
   /// "Hari ini" versi server (data contoh memakai tanggal tetap).
@@ -38,6 +42,19 @@ class CatalogController extends ChangeNotifier {
   int get payDeadlineHours => _meta?.payDeadlineHours ?? 24;
   String get bankName => _meta?.bank ?? '-';
   String get bankAccount => _meta?.account ?? '-';
+
+  /// Profil lembaga yang diatur admin (menu Profil & denah di dashboard).
+  InstitutionProfile get profile =>
+      _meta?.profile ?? InstitutionProfile.fallback;
+
+  /// Banner beranda aktif: banner bertanda utama, lalu banner terbaru.
+  NewsItem? get banner =>
+      _find(news, (n) => n.isHero) ?? _find(news, (n) => n.isBanner);
+
+  /// Berita, pengumuman, dan artikel budaya (tanpa banner).
+  List<NewsItem> get headlines => news.where((n) => !n.isBanner).toList();
+
+  NewsItem? newsById(String id) => _find(news, (n) => n.id == id);
 
   /// [quiet]: data lama tetap tampil selama memuat (tarik untuk segarkan),
   /// dan [Failure] diteruskan ke pemanggil bila server gagal dihubungi.
@@ -55,6 +72,7 @@ class CatalogController extends ChangeNotifier {
       facilities = catalog.facilities;
       communities = catalog.communities;
       gallery = catalog.gallery;
+      news = catalog.news;
       loadState = LoadState.ready;
     } on Failure catch (e) {
       if (keepShowing) rethrow;

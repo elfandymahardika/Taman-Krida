@@ -19,7 +19,7 @@ export default function Pengaturan() {
       <Note tone="info">
         Pengaturan berlaku untuk seluruh staf admin dan hanya bisa diubah Administrator utama. Yang langsung berlaku di backend:
         sakelar notifikasi, catat log aktivitas, durasi sesi (untuk login berikutnya), dan maks. percobaan masuk. Pengaturan
-        pemesanan & pembayaran dipakai aplikasi mobile setelah backend-nya tersedia. Nilai rekening merupakan data contoh.
+        pemesanan & pembayaran dipakai aplikasi mobile setelah backend-nya tersedia.
       </Note>
 
       {form.s && (

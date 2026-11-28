@@ -22,8 +22,11 @@ RUN npm ci --no-audit --no-fund
 FROM deps AS build
 COPY tsconfig.json ./
 COPY src ./src
+# `typescript` juga peer dependency opsional milik `prisma` (lockfile: devOptional), sehingga `npm prune --omit=dev`
+# tidak membuangnya. Prisma di sini memakai schema.prisma (bukan prisma.config.ts), jadi aman dihapus manual.
 RUN npm run build \
  && npm prune --omit=dev --no-audit --no-fund \
+ && rm -rf node_modules/typescript node_modules/.bin/tsc node_modules/.bin/tsserver \
  && npx prisma generate
 
 FROM ${NODE_IMAGE} AS runtime

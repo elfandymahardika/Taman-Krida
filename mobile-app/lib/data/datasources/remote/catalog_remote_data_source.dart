@@ -3,12 +3,14 @@ import '../../../domain/entities/community.dart';
 import '../../../domain/entities/cultural_event.dart';
 import '../../../domain/entities/facility.dart';
 import '../../../domain/entities/gallery_item.dart';
+import '../../../domain/entities/news_item.dart';
 import '../../models/app_meta_model.dart';
 import '../../models/community_model.dart';
 import '../../models/cultural_event_model.dart';
 import '../../models/facility_model.dart';
 import '../../models/gallery_item_model.dart';
 import '../../models/json.dart';
+import '../../models/news_item_model.dart';
 import 'api_client.dart';
 import 'facility_cache.dart';
 
@@ -19,6 +21,9 @@ abstract interface class CatalogRemoteDataSource {
   Future<List<Facility>> facilities();
   Future<List<Community>> communities();
   Future<List<GalleryItem>> gallery();
+
+  /// Konten terpublikasi dari menu Konten dashboard.
+  Future<List<NewsItem>> news();
 }
 
 /// Data publik dari API mobile (backend/mobile-app).
@@ -56,5 +61,11 @@ class CatalogRemoteDataSourceImpl implements CatalogRemoteDataSource {
   Future<List<GalleryItem>> gallery() async {
     final media = (await _api.get('/gallery') as List).cast<Json>();
     return [for (final m in media) GalleryItemModel.fromJson(m, media)];
+  }
+
+  @override
+  Future<List<NewsItem>> news() async {
+    final list = await _api.get('/contents') as List;
+    return list.cast<Json>().map(NewsItemModel.fromJson).toList();
   }
 }

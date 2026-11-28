@@ -3,12 +3,7 @@
  * harus diubah di kedua backend sekaligus, karena keduanya membaca/menulis tabel yang sama.
  */
 
-/** Tarif sewa per pemakaian (sama dengan RENTAL_RATES di dashboard), ditagihkan saat sewa disetujui. */
-export const RENTAL_RATES: Record<string, number> = {
-  'Pendopo Agung TKBJ': 2500000,
-  'Panggung Terbuka': 2000000,
-  'Gedung Kesenian & Galeri': 1500000,
-};
+/* Tarif sewa kini di kolom facilities.rental_rate (diatur admin di Profil & denah), bukan di kode. */
 
 /** Slot sewa di aplikasi (4 jam). `key` sama dengan enum RentalSlot di Flutter. */
 export const RENTAL_SLOTS = [
@@ -40,7 +35,7 @@ export const COMMUNITY_CATEGORIES = ['Seni tari tradisional', 'Seni pertunjukan'
 /** Metode bayar yang dipilih pengunjung saat mengunggah bukti. Dashboard mencatatnya sebagai metode pembayaran. */
 export const PAYMENT_METHODS = ['QRIS', 'Virtual Account', 'E-Wallet', 'Transfer bank'];
 
-/** Kategori acara untuk filter Kalender Acara di aplikasi, ditebak dari nama acara. */
+/** Kategori acara untuk filter Kalender Acara (sama dengan EVENT_CATEGORIES dashboard). Admin memilihnya di form acara; bila kosong ditebak dari nama. */
 export const EVENT_CATEGORIES = ['Wayang', 'Tari', 'Ketoprak', 'Musik', 'Pameran', 'Lainnya'];
 
 const CATEGORY_RULES: [string, RegExp][] = [

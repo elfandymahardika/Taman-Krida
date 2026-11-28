@@ -23,17 +23,17 @@ datasource db {
 
 /// Staf admin. `password_hash` = hash bcrypt. `role_key` kosong = pendaftar yang belum disetujui.
 model User {
-  id            BigInt      @id @default(autoincrement())
-  username      String      @unique(map: "username") @db.VarChar(40)
-  password_hash String      @db.VarChar(255)
-  name          String      @db.VarChar(60)
-  email         String      @unique(map: "email") @db.VarChar(100)
+  id            BigInt     @id @default(autoincrement())
+  username      String     @unique(map: "username") @db.VarChar(40)
+  password_hash String     @db.VarChar(255)
+  name          String     @db.VarChar(60)
+  email         String     @unique(map: "email") @db.VarChar(100)
   role_key      UserRole?
-  initials      String      @db.VarChar(4)
-  status        UserStatus  @default(Menunggu_persetujuan)
-  last_seen_at  DateTime?   @db.DateTime(3)
-  created_at    DateTime    @default(now()) @db.DateTime(3)
-  updated_at    DateTime    @default(now()) @db.DateTime(3)
+  initials      String     @db.VarChar(4)
+  status        UserStatus @default(Menunggu_persetujuan)
+  last_seen_at  DateTime?  @db.DateTime(3)
+  created_at    DateTime   @default(now()) @db.DateTime(3)
+  updated_at    DateTime   @default(now()) @db.DateTime(3)
   sessions      Session[]
   notes         Note[]
   documents     Document[]
@@ -91,14 +91,16 @@ model Kv {
 
 /// Area/fasilitas TKBJ. `bookable` = dipakai sebagai lokasi acara & sewa.
 model Facility {
-  id       String  @id @db.VarChar(50)
-  name     String  @unique(map: "name") @db.VarChar(60)
-  capacity Int?
-  purpose  String  @db.VarChar(100)
-  note     String? @db.VarChar(200)
-  photo    String? @db.VarChar(30)
-  bookable Boolean @default(false)
-  sort     Int
+  id          String  @id @db.VarChar(50)
+  name        String  @unique(map: "name") @db.VarChar(60)
+  capacity    Int?
+  purpose     String  @db.VarChar(100)
+  note        String? @db.VarChar(200)
+  photo       String? @db.VarChar(30)
+  bookable    Boolean @default(false)
+  sort        Int
+  /// Tarif sewa per pemakaian (Rp) untuk area yang bisa disewa; diatur admin di Profil & denah.
+  rental_rate Int?
 
   @@map("facilities")
 }
@@ -174,6 +176,40 @@ enum ContentStatus {
   @@map("contents_status")
 }
 
+/// Materi Edukasi Budaya di aplikasi mobile. `timeline`, `philosophy`, `images` = teks JSON;
+/// `images` berisi kunci foto bawaan aplikasi (mis. "wayang") atau berkas unggahan; foto pertama = sampul.
+/// Video: `video_file` (berkas unggahan) ATAU `video_link` (tautan YouTube/URL video), paling banyak satu terisi.
+model CultureTopic {
+  id             String        @id @db.VarChar(60)
+  title          String        @db.VarChar(80)
+  category       String        @db.VarChar(40)
+  summary        String        @db.VarChar(200)
+  headline       String        @db.VarChar(200)
+  read_minutes   Int           @default(5)
+  history        String        @db.Text
+  timeline_title String        @db.VarChar(60)
+  timeline       String        @db.Text
+  philosophy     String        @db.Text
+  images         String        @db.Text
+  video_minutes  Int           @default(0)
+  video_file     String?       @db.VarChar(500)
+  video_link     String?       @db.VarChar(500)
+  status         CultureStatus
+  author         String        @db.VarChar(60)
+  created_at     DateTime      @db.DateTime(3)
+  updated_at     DateTime      @db.DateTime(3)
+
+  @@index([status, created_at], map: "culture_topics_status_created_at")
+  @@map("culture_topics")
+}
+
+enum CultureStatus {
+  Terpublikasi
+  Draf
+
+  @@map("culture_topics_status")
+}
+
 /// Agenda acara. `quota` kosong = acara tanpa tiket.
 model Event {
   id         String      @id @db.VarChar(40)
@@ -191,6 +227,8 @@ model Event {
   photo      String?     @db.VarChar(30)
   /// Gambar unggahan admin (nama berkas di uploads/ atau URL Vercel Blob). Menggantikan `photo` bila diisi.
   image      String?     @db.VarChar(500)
+  /// Kategori filter Kalender di aplikasi (Wayang, Tari, …); kosong = ditebak dari nama acara.
+  category   String?     @db.VarChar(30)
   created_at DateTime    @db.DateTime(3)
   updated_at DateTime    @db.DateTime(3)
   orders     Order[]
@@ -280,18 +318,23 @@ enum PaymentStatus {
 
 /// Direktori komunitas seni. Pendaftaran baru menunggu persetujuan admin.
 model Community {
-  id         String          @id @db.VarChar(50)
-  name       String          @db.VarChar(100)
-  category   String          @db.VarChar(40)
-  city       String          @db.VarChar(60)
-  members    Int             @default(0)
-  contact    String          @db.VarChar(20)
-  photo      String?         @db.VarChar(30)
-  status     CommunityStatus
-  leader     String?         @db.VarChar(100)
-  since      String?         @db.VarChar(40)
-  admin_note String?         @db.VarChar(500)
-  applied_at DateTime?       @db.DateTime(3)
+  id           String          @id @db.VarChar(50)
+  name         String          @db.VarChar(100)
+  category     String          @db.VarChar(40)
+  city         String          @db.VarChar(60)
+  members      Int             @default(0)
+  contact      String          @db.VarChar(20)
+  photo        String?         @db.VarChar(30)
+  status       CommunityStatus
+  leader       String?         @db.VarChar(100)
+  since        String?         @db.VarChar(40)
+  admin_note   String?         @db.VarChar(500)
+  applied_at   DateTime?       @db.DateTime(3)
+  /// Profil di aplikasi: deskripsi, alamat sanggar, jadwal latihan (baris "hari | jam"), jumlah pentas.
+  description  String?         @db.VarChar(500)
+  address      String?         @db.VarChar(200)
+  schedule     String?         @db.VarChar(300)
+  performances String?         @db.VarChar(40)
 
   @@map("communities")
 }
@@ -401,14 +444,18 @@ model Document {
 
 /// Akun pengunjung aplikasi mobile (login email, tanpa peran).
 model Visitor {
-  id            BigInt               @id @default(autoincrement())
-  name          String               @db.VarChar(60)
-  email         String               @unique(map: "email") @db.VarChar(100)
-  phone         String               @db.VarChar(20)
-  city          String?              @db.VarChar(60)
-  password_hash String               @db.VarChar(255)
-  created_at    DateTime             @default(now()) @db.DateTime(3)
-  updated_at    DateTime             @default(now()) @db.DateTime(3)
+  id            BigInt                @id @default(autoincrement())
+  name          String                @db.VarChar(60)
+  email         String                @unique(map: "email") @db.VarChar(100)
+  phone         String                @db.VarChar(20)
+  city          String?               @db.VarChar(60)
+  password_hash String                @db.VarChar(255)
+  /// Aktif / Nonaktif (dinonaktifkan admin di dashboard → Akun pengunjung; tidak bisa login).
+  status        VisitorStatus         @default(Aktif)
+  disabled_note String?               @db.VarChar(200)
+  disabled_at   DateTime?             @db.DateTime(3)
+  created_at    DateTime              @default(now()) @db.DateTime(3)
+  updated_at    DateTime              @default(now()) @db.DateTime(3)
   sessions      VisitorSession[]
   orders        VisitorOrder[]
   rentals       VisitorRental[]
@@ -417,6 +464,13 @@ model Visitor {
   notifications VisitorNotification[]
 
   @@map("visitors")
+}
+
+enum VisitorStatus {
+  Aktif
+  Nonaktif
+
+  @@map("visitors_status")
 }
 
 /// Satu baris per login pengunjung (logout = `revoked_at`).

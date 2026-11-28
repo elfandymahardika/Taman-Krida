@@ -84,6 +84,8 @@ Semua respons berformat JSON. Error validasi dikirim sebagai `400 { error, field
 | `GET /api/events/:id` | Detail acara: harga, kuota, `remaining` |
 | `GET /api/gallery?type=&collection=` · `/gallery/collections` · `/gallery/:id` | Virtual galeri |
 | `GET /api/contents?type=` · `/contents/:id` | Berita, pengumuman, artikel budaya |
+| *(akun Nonaktif)* | Login → 403, token lama → 401 dengan pesan "Akun Anda dinonaktifkan…" (diatur admin di dashboard → Akun pengunjung) |
+| `GET /api/culture` · `/culture/:id` | Materi Edukasi Budaya terpublikasi (dikelola di dashboard → Edukasi budaya). `photos`: kunci foto bawaan aplikasi atau URL unggahan admin, pertama = sampul. `video`: `{ type: file | youtube | link, url }` atau `null` (`file` diputar di aplikasi) |
 | `GET /api/communities?category=&q=` · `/communities/:id` | Direktori komunitas aktif |
 | `GET /api/rentals/availability?facilityId=&month=YYYY-MM` | Kalender sewa: tiap slot `available` / `full` / `past` |
 | `POST /api/assistant/chat` | **Tanya Krida (asisten AI)**: `{ messages: [{ role: 'user' \| 'assistant', content }] }` → `{ reply, links: [{ kind, id?, label }], suggestions }`. Lihat [Tanya Krida](#tanya-krida-asisten-ai) |
@@ -129,7 +131,9 @@ Semua respons berformat JSON. Error validasi dikirim sebagai `400 { error, field
 
 - **Kuota tiket tidak bisa terlampaui.** Sisa kursi dihitung dari kuota − terjual − tiket yang sedang diverifikasi − tiket belum dibayar yang masih dalam batas bayar (Pengaturan dashboard → *Batas bayar*). Baris acara dikunci (`FOR UPDATE`) selama checkout. Batas tiket per acara juga mengikuti Pengaturan.
 - **Jadwal sewa tidak bisa ganda.** Slot dianggap terisi bila beririsan dengan acara atau sewa lain yang masih ditinjau maupun sudah disetujui. Baris fasilitas dikunci selama pengajuan, sehingga dua pengajuan bersamaan tidak bisa sama-sama lolos.
-- **Tarif sewa** sama dengan `RENTAL_RATES` di dashboard ([`lib/catalog.ts`](src/lib/catalog.ts)). Kalau tarif diubah, ubah di kedua backend.
+- **Tarif sewa** dibaca dari kolom `facilities.rental_rate` (diatur admin di Profil & denah). Area tanpa tarif tidak bisa disewa.
+- **Kategori acara** dari kolom `events.category` (dipilih admin); kosong = ditebak dari nama (`eventCategory`).
+- **Komunitas** mengirim `description`, `address`, `schedule` (`[{ day, time }]`), dan `performances` yang diisi admin. `/api/meta` juga mengirim `profile` (profil lembaga).
 - **Isolasi data (anti-IDOR):** semua query milik pengguna memakai `visitor_id` dari sesi. Data milik orang lain dibalas **404**.
 - **Token terpisah dari staf:** JWT pengunjung memakai klaim `aud: tkbj-mobile` dan tabel `visitor_sessions`, jadi token dashboard ditolak di sini, dan sebaliknya.
 - **Berkas privat:** KTP, surat, dan bukti transfer disimpan di **Vercel Blob** (`access: private`) bila `BLOB_READ_WRITE_TOKEN` diisi, atau dengan nama acak di `UPLOADS_DIR`. Berkas **tidak disajikan statis**: hanya bisa diunduh pemiliknya, dan admin membukanya lewat API dashboard yang memeriksa peran. Tipe berkas dicek dari *magic number*. Kalau penyimpanan ke database gagal, berkasnya ikut dihapus.
@@ -158,7 +162,7 @@ Flutter (layar chat) ──► POST /api/assistant/chat ──► Google Gemini 
   | `info_layanan` | Profil & kontak, aturan tiket (batas, batas bayar, pembatalan), alur & berkas sewa, 3 berita terbaru |
   | `materi_budaya` | Tentang TKBJ dan sejarah, linimasa, serta makna kesenian: Tari Remo, Topeng Malangan, Gandrung, Beskalan, Jaranan & Reog, Ludruk, Ketoprak, Wayang Kulit, Gamelan, Arsitektur Joglo |
 
-- **Materi budaya** ada di [`src/lib/cultureKnowledge.ts`](src/lib/cultureKnowledge.ts). Materi yang juga ada di Edukasi Budaya aplikasi memakai id yang sama, sehingga jawaban konsisten dan AI bisa memberi tombol *Baca materi*. Topik di luar materi boleh dijawab dari pengetahuan umum model, tetapi AI diminta tidak mengarang tahun atau nama. **Tanggal pendirian TKBJ sengaja belum diisi** karena belum ada sumber resmi; lengkapi entri `tkbj` bila sudah ada data dari pengelola.
+- **Materi budaya** ada di [`src/lib/cultureKnowledge.ts`](src/lib/cultureKnowledge.ts). Entri yang punya `idMateri` ditimpa isi materi Edukasi terbaru dari tabel `culture_topics` (yang diedit admin di dashboard), dan materi baru dari dashboard otomatis ikut dikenali; tombol *Baca materi* hanya muncul untuk materi yang sedang terbit. Topik di luar materi boleh dijawab dari pengetahuan umum model, tetapi AI diminta tidak mengarang tahun atau nama. **Tanggal pendirian TKBJ sengaja belum diisi** karena belum ada sumber resmi; lengkapi entri `tkbj` bila sudah ada data dari pengelola.
 - **Jawaban terstruktur:** `jawaban`, `tautan` (tombol ke layar aplikasi), dan `saran_pertanyaan`. Id tombol **dicek ulang ke database atau materi** dan labelnya dibuat server, jadi tombol tidak pernah mengarah ke acara atau materi yang tidak ada.
 - **Keamanan & kuota:** kunci API hanya di `.env` server, tidak pernah dikirim ke aplikasi. Tidak ada alat yang membaca data akun atau mengubah database. Riwayat dibatasi 12 pesan terakhir, pertanyaan ≤ 500 karakter, dan ada pembatas per IP (`AI_RATE_LIMIT_MAX`, bawaan 20 pertanyaan/15 menit). Error API AI dibalas pesan umum (kunci salah → 503, kuota habis → 429, gangguan → 502), detailnya hanya di log. Jawaban yang diblokir pengaman model dibalas pesan sopan.
 - **Kuota gratis Gemini** dihitung per proyek Google dan per hari. Satu pertanyaan biasanya memakai 2–3 permintaan ke Gemini (panggil alat, lalu jawab). Bila kuota habis, pengguna mendapat pesan *"Kuota Tanya Krida sedang habis"* dan fitur lain tetap jalan. Catatan privasi: di tier gratis, Google dapat memakai isi permintaan untuk meningkatkan produknya, jadi AI tidak pernah diberi data pribadi.

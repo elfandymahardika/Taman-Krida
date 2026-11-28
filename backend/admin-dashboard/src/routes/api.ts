@@ -3,6 +3,7 @@ import { config } from '../config/env';
 import { healthCheck } from '../lib/health';
 import * as communities from '../controllers/communityController';
 import * as contents from '../controllers/contentController';
+import * as culture from '../controllers/cultureController';
 import * as dashboard from '../controllers/dashboardController';
 import * as events from '../controllers/eventController';
 import * as feed from '../controllers/feedController';
@@ -15,12 +16,14 @@ import { search } from '../controllers/searchController';
 import * as settings from '../controllers/settingsController';
 import * as users from '../controllers/userController';
 import * as visitorFiles from '../controllers/visitorFileController';
+import * as visitors from '../controllers/visitorController';
 import { authMiddleware } from '../middleware/authMiddleware';
 import uploadRoutes from './upload.routes';
 import { requireAccess, requireRole, requireView } from '../middleware/requireRole';
 import {
   validateContent,
   validateContentUpdate,
+  validateCulture,
   validateEvent,
   validateMediaMeta,
   validateNote,
@@ -115,10 +118,32 @@ router.get('/contents', infoView, contents.getContents);
 router.post('/contents', infoEdit, validateContent, contents.addContent);
 router.put('/contents/:id', infoEdit, validateContentUpdate, contents.editContent);
 
+// Edukasi Budaya: materi yang tampil di menu Edukasi aplikasi mobile
+router.get('/culture', infoView, culture.getCultureTopics);
+router.post('/culture', infoEdit, validateCulture, culture.addCultureTopic);
+router.put('/culture/:id', infoEdit, validateCulture, culture.editCultureTopic);
+router.patch('/culture/:id', infoEdit, culture.patchCultureTopic);
+router.post(
+  '/culture/:id/images',
+  infoEdit,
+  express.raw({ type: 'image/*', limit: '6mb' }),
+  culture.uploadCultureImage,
+);
+router.post(
+  '/culture/:id/video',
+  infoEdit,
+  express.raw({ type: 'video/*', limit: culture.VIDEO_LIMIT }),
+  culture.uploadCultureVideo,
+);
+router.put('/culture/:id/video', infoEdit, culture.setCultureVideoLink);
+router.delete('/culture/:id/video', infoEdit, culture.removeCultureVideo);
+router.delete('/culture/:id', infoEdit, culture.removeCultureTopic);
+
 router.get('/communities', infoView, communities.getCommunities);
 router.post('/communities', infoEdit, communities.addCommunity);
 router.post('/communities/:id/approve', infoEdit, communities.approveCommunity);
 router.post('/communities/:id/reject', infoEdit, communities.rejectCommunity);
+router.put('/communities/:id', infoEdit, communities.editCommunity);
 router.patch('/communities/:id', infoEdit, communities.setCommunityStatus);
 
 // Catatan staf (Modul 02): semua staf, data dibatasi ke pemiliknya di controller (anti-IDOR)
@@ -144,6 +169,12 @@ router.post('/users', adminEdit, users.inviteUser);
 router.post('/users/:id/approve', adminEdit, users.approveUser);
 router.post('/users/:id/reject', adminEdit, users.rejectUser);
 router.patch('/users/:id', adminEdit, users.updateUser);
+
+// Akun pengunjung aplikasi mobile: lihat ringkasan, nonaktifkan / aktifkan kembali
+router.get('/visitors', adminView, visitors.getVisitors);
+router.get('/visitors/stats', adminView, visitors.getVisitorStats);
+router.get('/visitors/:id', adminView, visitors.getVisitor);
+router.patch('/visitors/:id', adminEdit, visitors.setVisitorAccountStatus);
 
 router.get('/settings', adminView, settings.getPanelSettings);
 router.put('/settings', adminEdit, settings.savePanelSettings);

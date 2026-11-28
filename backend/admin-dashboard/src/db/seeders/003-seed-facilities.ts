@@ -1,4 +1,4 @@
-import { FACILITIES } from './data';
+import { FACILITIES, RENTAL_RATES } from './data';
 import { Seeder } from './helpers';
 
 /** Area/fasilitas TKBJ. Tiga area pertama dipakai sebagai lokasi acara & sewa. */
@@ -15,6 +15,9 @@ export default {
         sort: i,
       })),
     });
+    // SQL mentah: kolom tarif tidak bergantung pada Prisma Client yang sudah digenerate ulang.
+    for (const [name, rate] of Object.entries(RENTAL_RATES))
+      await prisma.$executeRawUnsafe('UPDATE facilities SET rental_rate = ? WHERE name = ?', rate, name);
   },
 
   async down(prisma) {

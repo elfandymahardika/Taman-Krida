@@ -17,23 +17,32 @@ class GalleryItemModel extends GalleryItem {
     required super.period,
     required super.photos,
     required super.videoMinutes,
+    super.videos,
   });
 
   /// [all] = seluruh media: foto lain dalam koleksi yang sama ikut tampil
   /// sebagai album.
   factory GalleryItemModel.fromJson(Json m, List<Json> all) {
     final collection = m['collection'] as String;
-    String cover(Json x) =>
-        Visuals.photo(x['url'] as String?) ??
-        Visuals.photo(x['photo'] as String?) ??
-        AppImages.fasilitasGedung;
-    final album = [
-      cover(m),
-      for (final other in all)
-        if (other != m &&
-            other['collection'] == collection &&
-            other['type'] == 'Foto')
-          cover(other),
+    bool isVideo(Json x) => x['type'] == 'Video';
+    final sameCollection = [
+      for (final x in all)
+        if (x['collection'] == collection) x,
+    ];
+    // Berkas video tidak bisa jadi gambar: sampul video = foto bawaan atau
+    // foto lain dalam koleksi.
+    String? photoOf(Json x) => isVideo(x)
+        ? Visuals.photo(x['photo'] as String?)
+        : Visuals.photo(x['url'] as String?) ??
+              Visuals.photo(x['photo'] as String?);
+    final photos = [
+      for (final x in [m, ...sameCollection.where((x) => x != m)])
+        if (!isVideo(x) || x == m) ?photoOf(x),
+    ];
+    final album = photos.isEmpty ? [AppImages.fasilitasGedung] : photos;
+    final videos = [
+      for (final x in [m, ...sameCollection.where((x) => x != m)])
+        if (isVideo(x) && x['url'] is String) x['url'] as String,
     ];
     final date = DateTime.parse(m['date'] as String);
     final description = m['description'] as String? ?? '';
@@ -52,7 +61,8 @@ class GalleryItemModel extends GalleryItem {
       venue: m['credit'] as String,
       period: Formatters.monthYear(date),
       photos: album,
-      videoMinutes: m['type'] == 'Video' ? int.tryParse(minutes ?? '') ?? 1 : 0,
+      videoMinutes: isVideo(m) ? int.tryParse(minutes ?? '') ?? 1 : 0,
+      videos: videos,
     );
   }
 }

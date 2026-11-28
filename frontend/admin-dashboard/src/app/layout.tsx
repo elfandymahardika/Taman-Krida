@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     default: 'Panel Administrator TKBJ',
     template: '%s · Panel Administrator TKBJ',
   },
-  description: 'Panel administrator Taman Krida Budaya Jawa Timur (prototipe, data contoh).',
+  description: 'Panel administrator Taman Krida Budaya Jawa Timur.',
   icons: { icon: '/favicon.svg' },
 }
 

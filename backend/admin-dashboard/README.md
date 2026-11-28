@@ -83,6 +83,8 @@ Tabel panel admin:
 | `facilities` | Area/fasilitas TKBJ | |
 | `media` | Virtual galeri | |
 | `contents` | Konten aplikasi publik & banner beranda | |
+| *(migration `5_admin_managed_fields`)* | `facilities.rental_rate` (tarif sewa), `events.category` (kategori Kalender aplikasi), `communities.description/address/schedule/performances` (profil di direktori aplikasi) | |
+| `culture_topics` | Materi Edukasi Budaya aplikasi mobile (linimasa, filosofi, foto = teks JSON; migration `3_culture_topics` mengisi 6 materi awal; video = `video_file` atau `video_link`, migration `4_culture_video`) | |
 | `events` | Agenda acara + kuota/harga tiket | |
 | `rentals` | Permintaan sewa gedung | |
 | `orders` | Pesanan tiket & tagihan sewa | `event_id` → `events`, `rental_id` → `rentals` (SET NULL) |
@@ -209,6 +211,9 @@ Semua endpoint selain `/api/health`, `/api/auth/register`, dan `/api/auth/login`
 | `POST /api/media?name=&collection=&title=&description=` | Unggah berkas mentah (`Content-Type: image/*` atau `video/*`) → media draf |
 | `PUT/PATCH/DELETE /api/media/:id` | Metadata, status terbit, hapus (berkas ikut dihapus) |
 | `GET/POST /api/contents` · `PUT /api/contents/:id` | Konten & banner beranda (`isHero`) |
+| `GET /api/visitors?q=&status=&page=` · `/visitors/stats` · `/visitors/:id` · `PATCH /api/visitors/:id { status, note }` | Akun pengunjung aplikasi (Administrator utama): daftar + ringkasan aktivitas; `Nonaktif` wajib alasan, mencabut semua sesi, dan login ditolak; `Aktif` memulihkan |
+| `GET/POST /api/culture` · `PUT/PATCH/DELETE /api/culture/:id` · `POST /api/culture/:id/images` | Materi Edukasi Budaya: isi materi, terbitkan/tarik & urutan foto (`PATCH`), unggah foto mentah (`?cover=1` = jadikan sampul, maks. 8 foto, folder blob `edukasi`) |
+| `POST/PUT/DELETE /api/culture/:id/video` | Video materi: unggah berkas mentah MP4/WEBM/MOV (maks. `UPLOAD_LIMIT_MB`), atau `PUT { link }` tautan https (YouTube/URL video); berkas dan tautan saling menggantikan |
 | `GET/POST /api/users` · `PATCH /api/users/:id` | Staf: undang, ubah peran, aktif/nonaktif (nonaktif = semua sesi dicabut) |
 | `POST /api/users/:id/approve` `{ roleKey }` · `POST /api/users/:id/reject` | Setujui (pilih peran) atau tolak pendaftaran |
 | `GET /api/users/roles` | Peran, modul, dan matriks hak akses |

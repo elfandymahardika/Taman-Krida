@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import { transaction, Queryable } from '../config/db';
 import { config } from '../config/env';
-import { findSlot, PAYMENT_LABELS, RENTAL_DOCUMENTS, RENTAL_RATES, RENTAL_SLOTS, slotOf } from '../lib/catalog';
+import { findSlot, PAYMENT_LABELS, RENTAL_DOCUMENTS, RENTAL_SLOTS, slotOf } from '../lib/catalog';
 import { hhmm, iso, lastDay, parseMonth, rupiah, shortDate } from '../lib/format';
 import { assertValid, badRequest, conflict, FieldErrors, notFound, queryText, retryOnDuplicate } from '../lib/http';
 import { rentalNoticeKey, rentalStatusLabel, rentalStatusOf } from '../lib/catalog';
@@ -67,7 +67,7 @@ function toRental(r: VisitorRental) {
     filesComplete: Boolean(r.files_ok),
     submittedAt: iso(r.submitted_at),
     decidedAt: iso(r.decided_at),
-    amount: r.invoice_amount ?? RENTAL_RATES[r.venue],
+    amount: r.invoice_amount ?? r.venue_rate ?? undefined,
     payment: r.invoice_payment ?? undefined,
     paymentLabel: r.invoice_payment ? PAYMENT_LABELS[r.invoice_payment] : undefined,
     method: r.invoice_method ?? undefined,

@@ -11,6 +11,7 @@ class GalleryItem {
     required this.period,
     required this.photos,
     required this.videoMinutes,
+    this.videos = const [],
   });
 
   final String id;
@@ -31,6 +32,10 @@ class GalleryItem {
   /// Path foto. Foto pertama menjadi sampul kartu.
   final List<String> photos;
   final int videoMinutes;
+
+  /// URL video unggahan admin di koleksi ini (diputar di aplikasi). Kosong =
+  /// koleksi tanpa video.
+  final List<String> videos;
 
   String get cover => photos.first;
 }

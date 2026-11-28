@@ -18,6 +18,8 @@ import {
   updateVisitorProfile,
   Visitor,
   visitorStats,
+  DISABLED_MESSAGE,
+  visitorStatus,
 } from '../models/visitorModel';
 
 /** Akun dikunci 15 menit setelah 5 kali kata sandi salah (middleware/rateLimiter.ts). */
@@ -80,6 +82,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     throw new HttpError(401, 'Email atau kata sandi salah.');
   }
   loginLockout.reset(email);
+  // Dicek setelah password benar, agar status akun tidak bocor ke orang yang tidak tahu password-nya.
+  if ((await visitorStatus(visitor.id))?.status === 'Nonaktif') throw new HttpError(403, DISABLED_MESSAGE);
 
   res.json({ ...(await signToken(visitor, req.get('user-agent'))), user: toVisitor(visitor) });
 };

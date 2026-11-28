@@ -1,4 +1,4 @@
-import pool from '../config/db';
+import pool, { Queryable } from '../config/db';
 import { RowDataPacket } from 'mysql2';
 
 export interface Facility {
@@ -10,6 +10,8 @@ export interface Facility {
   photo: string | null;
   bookable: number;
   sort: number;
+  /** Tarif sewa per pemakaian (Rp); hanya untuk area yang bisa disewa. */
+  rental_rate: number | null;
 }
 
 export interface FacilityRow extends RowDataPacket, Facility {}
@@ -22,7 +24,14 @@ export const toFacility = (f: Facility) => ({
   note: f.note ?? undefined,
   photo: f.photo ?? undefined,
   bookable: Boolean(f.bookable),
+  rentalRate: f.rental_rate ?? undefined,
 });
+
+/** Tarif sewa venue (nama area) dari database; null bila area tidak punya tarif. */
+export const rentalRateOfVenue = async (venue: string, db: Queryable = pool): Promise<number | null> => {
+  const [rows] = await db.execute<FacilityRow[]>('SELECT rental_rate FROM facilities WHERE name = ? LIMIT 1', [venue]);
+  return rows[0]?.rental_rate ?? null;
+};
 
 export const findFacilityById = async (id: string): Promise<Facility | null> => {
   const [rows] = await pool.execute<FacilityRow[]>('SELECT * FROM facilities WHERE id = ? LIMIT 1', [id]);
@@ -56,7 +65,10 @@ export const createFacility = async (f: { id: string; name: string; capacity: nu
   ]);
 };
 
-export const updateFacility = async (id: string, f: { name: string; capacity: number | null; purpose: string; note: string | null }) => {
+export const updateFacility = async (
+  id: string,
+  f: { name: string; capacity: number | null; purpose: string; note: string | null; rentalRate?: number | null },
+) => {
   await pool.execute('UPDATE facilities SET name = ?, capacity = ?, purpose = ?, note = ? WHERE id = ?', [
     f.name,
     f.capacity,
@@ -64,4 +76,5 @@ export const updateFacility = async (id: string, f: { name: string; capacity: nu
     f.note,
     id,
   ]);
+  if (f.rentalRate !== undefined) await pool.execute('UPDATE facilities SET rental_rate = ? WHERE id = ?', [f.rentalRate, id]);
 };

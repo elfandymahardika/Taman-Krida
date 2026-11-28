@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
+import { rentalRateOfVenue } from '../models/facilityModel';
 import { transaction } from '../config/db';
-import { RENTAL_RATES } from '../db/seeders/data';
 import { logActivity, notify } from '../lib/activity';
 import { hhmm, iso, shortDate } from '../lib/format';
 import { conflict, likePattern, notFound, queryText, where } from '../lib/http';
@@ -58,7 +58,7 @@ async function toRental(r: Rental) {
     submittedAt: iso(r.submitted_at),
     decidedAt: iso(r.decided_at),
     payment: invoice?.payment,
-    amount: invoice?.amount ?? RENTAL_RATES[r.venue],
+    amount: invoice?.amount ?? (await rentalRateOfVenue(r.venue)) ?? undefined,
     conflicts: await conflictsOf(r),
   };
 }
@@ -110,10 +110,12 @@ export const approveRental = async (req: Request<{ id: string }>, res: Response)
   const clash = await conflictsOf(rental);
   if (clash.length) throw conflict(`Tidak dapat disetujui: bentrok dengan ${clash.map(describe).join(', ')}.`);
 
+  const rate = await rentalRateOfVenue(rental.venue);
+  if (rate === null) throw conflict(`Tarif sewa ${rental.venue} belum diatur. Isi tarifnya di Profil & denah.`);
   await transaction(async (conn) => {
     await decideRental(rental.id, 'Disetujui', req.body?.note || null, conn);
     // Tagihan sewa dibuat setelah disetujui; pemohon membayar lewat aplikasi.
-    await createRentalInvoice({ ...rental, amount: RENTAL_RATES[rental.venue] }, conn);
+    await createRentalInvoice({ ...rental, amount: rate }, conn);
     await logActivity('rental', 'Sewa gedung disetujui', `${res.locals.user.name} · ${rental.applicant}, ${shortDate(rental.date)}`, conn);
     await notify(`Sewa ${rental.id} disetujui — tagihan dikirim ke pemohon`, '/sewa', 'rental', conn);
   });

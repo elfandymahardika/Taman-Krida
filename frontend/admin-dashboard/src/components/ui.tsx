@@ -567,7 +567,6 @@ export function PageFooter() {
   return (
     <footer className="page-footer">
       <p>© 2026 TKBJ • Disbudpar Provinsi Jawa Timur</p>
-      <p>Seluruh angka dan aktivitas merupakan data contoh.</p>
     </footer>
   )
 }

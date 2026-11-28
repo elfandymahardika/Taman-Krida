@@ -829,3 +829,146 @@ describe('gambar acara unggahan admin', () => {
     assert.equal((await call('/events/wayang')).body.photo, 'wayang', 'tanpa unggahan → kunci foto bawaan');
   });
 });
+
+describe('edukasi budaya dari dashboard', () => {
+  test('aplikasi hanya menerima materi terpublikasi; foto bawaan = kunci, unggahan = URL', async () => {
+    const list = (await call('/culture')).body;
+    assert.equal(list.length, 6);
+    assert.equal(list[0].id, 'wayang-kulit');
+    assert.deepEqual(list[0].photos, ['wayang', 'panggung', 'gamelan', 'pendopo']);
+    assert.equal(list[0].timeline.length, 3);
+
+    // Admin menarik Ketoprak dan menambah foto unggahan sebagai sampul Gamelan.
+    assert.equal((await adminCall('/culture/ketoprak', { method: 'PATCH', body: { status: 'Draf' } })).status, 200);
+    await pool.execute('UPDATE culture_topics SET images = ? WHERE id = ?', [JSON.stringify(['1-ab-gamelan.png', 'gedung']), 'gamelan']);
+    const after = (await call('/culture')).body;
+    assert.ok(!after.some((c: any) => c.id === 'ketoprak'));
+    assert.deepEqual(after.find((c: any) => c.id === 'gamelan').photos, [`${config.adminPublicUrl}/uploads/1-ab-gamelan.png`, 'gedung']);
+    assert.equal((await call('/culture/ketoprak')).status, 404);
+    assert.equal((await call('/culture/gamelan')).body.title, 'Gamelan Slendro Pelog');
+  });
+
+  test('video materi: berkas & tautan .mp4 diputar di aplikasi, YouTube/tautan lain dibuka di luar', async () => {
+    assert.equal((await call('/culture/wayang-kulit')).body.video, null);
+    const videoOf = async (file: string | null, link: string | null) => {
+      await pool.execute('UPDATE culture_topics SET video_file = ?, video_link = ? WHERE id = ?', [file, link, 'wayang-kulit']);
+      return (await call('/culture/wayang-kulit')).body.video;
+    };
+    assert.deepEqual(await videoOf('1-ab-wayang.mp4', null), { type: 'file', url: `${config.adminPublicUrl}/uploads/1-ab-wayang.mp4` });
+    assert.equal((await videoOf(null, 'https://youtu.be/abc')).type, 'youtube');
+    assert.equal((await videoOf(null, 'https://m.youtube.com/watch?v=abc')).type, 'youtube');
+    assert.equal((await videoOf(null, 'https://cdn.contoh.test/wayang.MP4')).type, 'file');
+    assert.equal((await videoOf(null, 'https://drive.google.com/file/d/abc/view')).type, 'link');
+    assert.equal((await videoOf(null, 'https://notyoutube.com/v')).type, 'link');
+    await videoOf(null, null);
+  });
+
+  test('Tanya Krida memakai isi materi terbaru & hanya menautkan materi yang terbit', async () => {
+    const { runTool, resolveLinks } = await import('../src/lib/assistantTools');
+    // Materi baru dari dashboard langsung dikenali asisten.
+    const created = await adminCall('/culture', {
+      method: 'POST',
+      body: {
+        title: 'Ludruk Suroboyoan',
+        category: 'Teater',
+        status: 'Terpublikasi',
+        readMinutes: 5,
+        summary: 'Teater rakyat khas Surabaya.',
+        headline: 'Teater rakyat yang jenaka dan kritis.',
+        history: 'Ludruk berkembang di Jombang dan Surabaya sebagai teater rakyat.',
+        timelineTitle: 'Linimasa',
+        videoMinutes: 0,
+        timeline: [{ label: '1930-an', text: 'Ludruk populer di Surabaya.' }],
+        philosophy: [],
+      },
+    });
+    assert.equal(created.status, 201);
+    const ludruk = (await runTool('materi_budaya', { topik: 'ludruk suroboyoan' })).data as any;
+    assert.ok(ludruk.materi.some((m: any) => m.id_materi_aplikasi === 'ludruk-suroboyoan'));
+
+    // Isi yang diedit admin dipakai, bukan teks lama di cultureKnowledge.ts.
+    const wayang = (await adminCall('/culture')).body.find((c: any) => c.id === 'wayang-kulit');
+    await adminCall('/culture/wayang-kulit', { method: 'PUT', body: { ...wayang, history: 'Sejarah wayang versi terbaru dari admin TKBJ.' } });
+    const updated = (await runTool('materi_budaya', { topik: 'wayang kulit' })).data as any;
+    assert.equal(updated.materi[0].sejarah, 'Sejarah wayang versi terbaru dari admin TKBJ.');
+
+    // Ketoprak ditarik (tes sebelumnya): tetap dijelaskan, tetapi tanpa tombol ke materinya.
+    const ketoprak = (await runTool('materi_budaya', { topik: 'ketoprak' })).data as any;
+    assert.equal(ketoprak.materi[0].id_materi_aplikasi, undefined);
+    const links = await resolveLinks([
+      { jenis: 'edukasi', id: 'ketoprak' },
+      { jenis: 'edukasi', id: 'ludruk-suroboyoan' },
+    ]);
+    assert.deepEqual(links, [
+      { kind: 'edukasi', label: 'Buka Edukasi Budaya' },
+      { kind: 'edukasi', id: 'ludruk-suroboyoan', label: 'Baca materi Ludruk Suroboyoan' },
+    ]);
+  });
+});
+
+describe('semua data aplikasi diatur dari dashboard', () => {
+  test('profil, konten, tarif sewa, kategori acara, dan komunitas yang diedit admin langsung tampil di aplikasi', async () => {
+    // Profil lembaga → /meta
+    const { profile } = (await adminCall('/profile')).body;
+    await adminCall('/profile', { method: 'PUT', body: { ...profile, hours: 'Setiap hari · 08.00–20.00 WIB' } });
+    assert.equal((await call('/meta')).body.profile.hours, 'Setiap hari · 08.00–20.00 WIB');
+
+    // Konten → /contents (hanya yang terpublikasi)
+    const created = (await adminCall('/contents', { method: 'POST', body: { title: 'Pentas uji pekan depan', type: 'Berita' } })).body;
+    assert.ok(!(await call('/contents')).body.some((c: any) => c.id === created.id), 'draf belum tampil');
+    await adminCall(`/contents/${created.id}`, { method: 'PUT', body: { status: 'Terpublikasi', body: 'Isi lengkap berita uji.' } });
+    const news = (await call('/contents')).body.find((c: any) => c.id === created.id);
+    assert.equal(news.body, 'Isi lengkap berita uji.');
+
+    // Tarif sewa → /facilities (rentalRate) dan bisa disewa
+    const pendopo = (await adminCall('/facilities')).body.find((f: any) => f.id === 'pendopo');
+    await adminCall('/facilities/pendopo', { method: 'PUT', body: { ...pendopo, rentalRate: 2750000 } });
+    const app = (await call('/facilities')).body.find((f: any) => f.id === 'pendopo');
+    assert.equal(app.rentalRate, 2750000);
+    assert.equal(app.rentable, true);
+
+    // Kategori acara → /events
+    const ev = (await adminCall('/events')).body.find((e: any) => e.status === 'Terpublikasi');
+    await adminCall(`/events/${ev.id}`, { method: 'PUT', body: { ...ev, category: 'Pameran' } });
+    assert.equal((await call(`/events/${ev.id}`)).body.category, 'Pameran');
+    await adminCall(`/events/${ev.id}`, { method: 'PUT', body: { ...ev, category: '' } });
+
+    // Komunitas → /communities/:id
+    const c = (await call('/communities')).body[0];
+    const full = (await adminCall('/communities')).body.find((x: any) => x.id === c.id);
+    await adminCall(`/communities/${c.id}`, {
+      method: 'PUT',
+      body: { ...full, description: 'Deskripsi dari admin.', schedule: 'Sabtu | 15.00–17.00', performances: '12 pentas', address: 'Jl. Uji 1' },
+    });
+    const shown = (await call(`/communities/${c.id}`)).body;
+    assert.equal(shown.description, 'Deskripsi dari admin.');
+    assert.deepEqual(shown.schedule, [{ day: 'Sabtu', time: '15.00–17.00' }]);
+    assert.equal(shown.performances, '12 pentas');
+    assert.equal(shown.address, 'Jl. Uji 1');
+  });
+});
+
+describe('akun dinonaktifkan dari dashboard', () => {
+  test('token lama ditolak, login ditolak dengan alasan, lalu bisa masuk lagi setelah diaktifkan', async () => {
+    const email = 'dewi.nonaktif@email.com';
+    const reg = await call('/auth/register', { method: 'POST', body: { name: 'Dewi Uji', email, phone: '081234567891', password: 'Rahasia123' } });
+    assert.equal(reg.status, 201);
+    const token = reg.body.token;
+    assert.equal((await call('/auth/me', { token })).status, 200);
+
+    const visitor = (await adminCall(`/visitors?page=1&q=${encodeURIComponent(email)}`)).body.data[0];
+    await adminCall(`/visitors/${visitor.id}`, { method: 'PATCH', body: { status: 'Nonaktif', note: 'Uji penonaktifan akun.' } });
+
+    const me = await call('/auth/me', { token });
+    assert.equal(me.status, 401, 'aplikasi keluar dari sesi');
+    assert.match(me.body.error, /dinonaktifkan/);
+    const wrong = await call('/auth/login', { method: 'POST', body: { email, password: 'SalahSekali1' } });
+    assert.equal(wrong.status, 401, 'status akun tidak bocor tanpa password benar');
+    const denied = await call('/auth/login', { method: 'POST', body: { email, password: 'Rahasia123' } });
+    assert.equal(denied.status, 403);
+    assert.match(denied.body.error, /dinonaktifkan/);
+
+    await adminCall(`/visitors/${visitor.id}`, { method: 'PATCH', body: { status: 'Aktif' } });
+    assert.equal((await call('/auth/login', { method: 'POST', body: { email, password: 'Rahasia123' } })).status, 200);
+  });
+});

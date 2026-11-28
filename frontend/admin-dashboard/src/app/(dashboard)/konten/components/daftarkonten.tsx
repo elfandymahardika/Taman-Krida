@@ -38,6 +38,16 @@ export default function DaftarKonten({ contents, loaded, page, onPage }: Props) 
           ],
         },
         { name: 'summary', label: 'Isi ringkas', as: 'textarea', defaultValue: c.summary, placeholder: 'Opsional · maksimal 300 karakter' },
+        {
+          name: 'body',
+          label: 'Isi konten',
+          as: 'textarea',
+          rows: 5,
+          defaultValue: c.body,
+          maxLength: 1000,
+          placeholder: 'Opsional · maksimal 1000 karakter',
+          hint: 'Ringkasan & isi tampil di Beranda aplikasi mobile (Kabar TKBJ) bila konten berstatus Terpublikasi.',
+        },
       ],
     })
 

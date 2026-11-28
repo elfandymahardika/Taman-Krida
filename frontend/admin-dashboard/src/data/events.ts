@@ -11,6 +11,9 @@ import type { PhotoKey } from './sample'
 
 export const VENUES = ['Pendopo Agung TKBJ', 'Panggung Terbuka', 'Gedung Kesenian & Galeri']
 export const EVENT_STATUSES = ['Terpublikasi', 'Draf']
+/** Kategori filter Kalender di aplikasi mobile. Kosong = otomatis ditebak dari nama acara. */
+export const EVENT_CATEGORIES = ['Wayang', 'Tari', 'Ketoprak', 'Musik', 'Pameran', 'Lainnya']
+export const AUTO_CATEGORY = 'Otomatis (dari nama acara)'
 
 export type EventStatus = 'Terpublikasi' | 'Draf'
 
@@ -33,6 +36,8 @@ export type Event = {
   photo?: PhotoKey | null
   /** Gambar unggahan admin (/uploads/... atau URL blob). Diutamakan daripada `photo`. */
   imageUrl?: string
+  /** Kategori pilihan admin; kosong = otomatis dari nama. */
+  category?: string
 }
 
 /** Gambar acara yang boleh diunggah (dicek ulang di backend, termasuk isi berkasnya). */
@@ -55,7 +60,7 @@ export function validateEventImage(value: unknown) {
 }
 
 /** Isian formulir acara (semua berupa teks dari FormData). */
-export type EventInput = Partial<Record<'name' | 'organizer' | 'date' | 'start' | 'end' | 'venue' | 'status' | 'quota' | 'price', string>>
+export type EventInput = Partial<Record<'name' | 'organizer' | 'date' | 'start' | 'end' | 'venue' | 'status' | 'quota' | 'price' | 'category', string>>
 
 /* ---------- Format tampilan ---------- */
 

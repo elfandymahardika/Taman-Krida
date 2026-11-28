@@ -4,15 +4,17 @@ import { likePattern, queryText } from '../lib/http';
 import { canOpen, roleLabel } from '../lib/roles';
 import { searchCommunities } from '../models/communityModel';
 import { searchContents } from '../models/contentModel';
+import { searchCultureTopics } from '../models/cultureModel';
 import { searchEvents } from '../models/eventModel';
 import { searchMedia } from '../models/mediaModel';
 import { orderSummary, searchOrders } from '../models/orderModel';
 import { searchRentals } from '../models/rentalModel';
 import { searchUsers } from '../models/userModel';
+import { searchVisitors } from '../models/visitorModel';
 
 const PER_TYPE = 5;
 
-/** Pencarian global topbar: acara, transaksi, sewa, komunitas, konten, galeri, dan staf. */
+/** Pencarian global topbar: acara, transaksi, sewa, komunitas, konten, edukasi, galeri, dan staf. */
 export const search = async (req: Request, res: Response) => {
   const q = queryText(req.query.q).trim();
   if (q.length < 2) {
@@ -56,6 +58,13 @@ export const search = async (req: Request, res: Response) => {
     sub: `${c.type} · ${c.status}`,
     href: '/konten',
   }));
+  const culture = (await searchCultureTopics(p, PER_TYPE)).map((c) => ({
+    type: 'Edukasi',
+    id: c.id,
+    title: c.title,
+    sub: `${c.category} · ${c.status}`,
+    href: '/edukasi',
+  }));
   const media = (await searchMedia(p, PER_TYPE)).map((m) => ({
     type: 'Galeri',
     id: m.id,
@@ -71,8 +80,16 @@ export const search = async (req: Request, res: Response) => {
     href: '/pengguna',
   }));
 
+  const visitorHits = (await searchVisitors(p, PER_TYPE)).map((v) => ({
+    type: 'Pengunjung',
+    id: String(v.id),
+    title: v.name,
+    sub: `${v.email} · ${v.status}`,
+    href: '/pengunjung',
+  }));
+
   // Hanya hasil dari halaman yang boleh dibuka peran ini.
-  const results = [...events, ...orders, ...rentals, ...communities, ...contents, ...media, ...users].filter((r) =>
+  const results = [...events, ...orders, ...rentals, ...communities, ...contents, ...culture, ...media, ...users, ...visitorHits].filter((r) =>
     canOpen(res.locals.user.role_key, r.href),
   );
   res.json({ query: q, results });

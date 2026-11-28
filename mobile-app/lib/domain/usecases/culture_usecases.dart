@@ -6,13 +6,5 @@ class GetCultureTopicsUseCase {
 
   final CultureRepository _repository;
 
-  List<CultureTopic> call() => _repository.getTopics();
-}
-
-class GetCultureCategoriesUseCase {
-  const GetCultureCategoriesUseCase(this._repository);
-
-  final CultureRepository _repository;
-
-  List<String> call() => _repository.getCategories();
+  Future<List<CultureTopic>> call() => _repository.getTopics();
 }

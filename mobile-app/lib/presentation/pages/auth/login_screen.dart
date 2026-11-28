@@ -35,6 +35,13 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _busy = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Mis. "Akun Anda dinonaktifkan oleh pengelola TKBJ…" setelah sesi dicabut.
+    _loginError = context.read<AuthController>().takeSignedOutNotice();
+  }
+
+  @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();

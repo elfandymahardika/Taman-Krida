@@ -1,7 +1,6 @@
 import pool from '../config/db';
 import { adminFileUrl } from '../lib/adminFiles';
 import { RowDataPacket } from 'mysql2';
-import { RENTAL_RATES } from '../lib/catalog';
 import { iso } from '../lib/format';
 import { SqlValue } from '../lib/http';
 
@@ -19,12 +18,14 @@ export interface Facility {
   photo: string | null;
   bookable: number;
   sort: number;
+  /** Tarif sewa per pemakaian, diatur admin di Profil & denah. */
+  rental_rate: number | null;
 }
 
 interface FacilityRow extends RowDataPacket, Facility {}
 
-/** Fasilitas bisa disewa bila dipakai sebagai lokasi (bookable) dan punya tarif. */
-export const rentalRateOf = (f: Facility) => (f.bookable ? (RENTAL_RATES[f.name] ?? null) : null);
+/** Fasilitas bisa disewa bila dipakai sebagai lokasi (bookable) dan admin sudah mengisi tarifnya. */
+export const rentalRateOf = (f: Facility) => (f.bookable && f.rental_rate != null ? f.rental_rate : null);
 
 export const toFacility = (f: Facility) => ({
   id: f.id,

@@ -4,10 +4,13 @@ import { Badge, Card, Photo } from '@/components/ui'
 import { useOverlay } from '@/components/overlay'
 import { PHOTOS } from '@/data/sample'
 import { mutate } from '@/lib/api'
+import { useAccess } from '@/lib/access'
+import { communityForm } from './formkomunitas'
 
 /** Daftar profil komunitas di direktori + modal profil (aktifkan/nonaktifkan). */
 export default function DaftarKomunitas({ communities, loaded }: { communities: any[]; loaded: boolean }) {
   const overlay = useOverlay()
+  const canEdit = useAccess().canEdit('info')
 
   const showProfile = (c) =>
     overlay.showDetail({
@@ -18,6 +21,10 @@ export default function DaftarKomunitas({ communities, loaded }: { communities: 
         ['Ketua', c.leader ?? '—'],
         ['Anggota', c.members ? `${c.members} orang` : '—'],
         ['Kontak', c.contact],
+        ['Alamat', c.address || '—'],
+        ['Jadwal latihan', c.schedule ? c.schedule.split('\n').join(' · ') : '—'],
+        ['Jumlah pentas', c.performances || '—'],
+        ['Deskripsi', c.description || '—'],
         ['Status', c.status],
       ],
       primaryLabel: c.status === 'Aktif' ? 'Nonaktifkan' : 'Aktifkan',
@@ -45,6 +52,11 @@ export default function DaftarKomunitas({ communities, loaded }: { communities: 
               <button className="link link--sm" onClick={() => showProfile(c)}>
                 Profil →
               </button>
+              {canEdit && c.status !== 'Ditolak' && (
+                <button className="link link--sm" onClick={() => overlay.showForm(communityForm(c))}>
+                  Edit →
+                </button>
+              )}
             </div>
           </div>
         ))}

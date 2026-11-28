@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/constants/app_assets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_text_styles.dart';
+import '../../../core/utils/formatters.dart';
+import '../../../domain/entities/app_meta.dart';
+import '../../../domain/entities/news_item.dart';
 import '../../routes/app_routes.dart';
 import '../../controllers/controllers.dart';
 import '../../widgets/common/app_card.dart';
@@ -15,8 +18,9 @@ import '../menu/service_entries.dart';
 import 'widgets/event_carousel.dart';
 import 'widgets/service_shortcut.dart';
 
-/// Beranda (tab pertama): sapaan, pintasan layanan, carousel acara
-/// mendatang, dan sekilas tentang TKBJ.
+/// Beranda (tab pertama): sapaan, banner dari dashboard, pintasan layanan,
+/// carousel acara mendatang, kabar terbaru (menu Konten), dan sekilas
+/// tentang TKBJ (menu Profil).
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -35,6 +39,11 @@ class HomeScreen extends StatelessWidget {
             .where((e) => !rentalController.isDatePast(e.date))
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
+    final banner = catalogController.banner;
+    final headlines = catalogController.headlines.take(3).toList();
+    void openNews(NewsItem item) =>
+        Navigator.of(context)
+            .pushNamed(AppRoutes.newsDetail, arguments: item.id);
 
     return TkbjScaffold(
       toolbarTitle: const BrandLogo(onDark: true),
@@ -58,6 +67,22 @@ class HomeScreen extends StatelessWidget {
         onTickets: () => AppRoutes.open(context, AppRoutes.tickets),
       ),
       children: [
+        if (banner != null)
+          ContentSection(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: _BannerCard(
+              item: banner,
+              onTap: () => openNews(banner),
+              onAction: banner.link == null
+                  ? null
+                  : () {
+                      // Tautan tak dikenal → buka detail banner saja.
+                      if (!AppRoutes.openLink(context, banner.link!)) {
+                        openNews(banner);
+                      }
+                    },
+            ),
+          ),
         ContentSection(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
           child: _ServiceGrid(
@@ -97,6 +122,21 @@ class HomeScreen extends StatelessWidget {
                       .pushNamed(AppRoutes.eventDetail, arguments: event.id),
             ),
           ),
+        if (headlines.isNotEmpty)
+          ContentSection(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _SectionTitle('Kabar TKBJ'),
+                const SizedBox(height: 8),
+                for (final item in headlines) ...[
+                  _NewsTile(item: item, onTap: () => openNews(item)),
+                  const SizedBox(height: 10),
+                ],
+              ],
+            ),
+          ),
         ContentSection(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
           child: Column(
@@ -105,6 +145,7 @@ class HomeScreen extends StatelessWidget {
               const _SectionTitle('Tentang TKBJ'),
               const SizedBox(height: 12),
               _AboutCard(
+                profile: catalogController.profile,
                 onTap: () => Navigator.of(context).pushNamed(AppRoutes.profile),
               ),
             ],
@@ -380,8 +421,9 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _AboutCard extends StatelessWidget {
-  const _AboutCard({required this.onTap});
+  const _AboutCard({required this.profile, required this.onTap});
 
+  final InstitutionProfile profile;
   final VoidCallback onTap;
 
   @override
@@ -409,9 +451,10 @@ class _AboutCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Jl. Soekarno-Hatta No. 7, Kota Malang · '
-                  'Disbudpar Jatim',
+                  '${profile.address} · ${profile.hours}',
                   style: AppText.poppins(11, color: AppColors.muted),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -422,6 +465,118 @@ class _AboutCard extends StatelessWidget {
                     color: AppColors.maroon,
                   ),
                 ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.muted),
+        ],
+      ),
+    );
+  }
+}
+
+/// Banner beranda dari menu Konten dashboard.
+class _BannerCard extends StatelessWidget {
+  const _BannerCard({required this.item, required this.onTap, this.onAction});
+
+  final NewsItem item;
+  final VoidCallback onTap;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = item.body.isNotEmpty ? item.body : item.summary;
+    return Material(
+      color: AppColors.maroon,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                item.title,
+                style: AppText.playfair(18, color: AppColors.white),
+              ),
+              if (text.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  text,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppText.poppins(12, color: AppColors.blush),
+                ),
+              ],
+              if (onAction != null) ...[
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: onAction,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.gold,
+                    foregroundColor: AppColors.maroonDark,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  child: Text(
+                    item.cta ?? 'Selengkapnya',
+                    style: AppText.poppins(
+                      12,
+                      weight: FontWeight.w600,
+                      color: AppColors.maroonDark,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Satu kabar (berita, pengumuman, artikel budaya) di beranda.
+class _NewsTile extends StatelessWidget {
+  const _NewsTile({required this.item, required this.onTap});
+
+  final NewsItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: const EdgeInsets.all(12),
+      onTap: onTap,
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${item.type} · ${Formatters.shortDate(item.updatedAt)}',
+                  style: AppText.poppins(
+                    10,
+                    weight: FontWeight.w600,
+                    color: AppColors.gold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.title,
+                  style: AppText.poppins(13, weight: FontWeight.w600),
+                ),
+                if (item.summary.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    item.summary,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppText.poppins(11, color: AppColors.muted),
+                  ),
+                ],
               ],
             ),
           ),

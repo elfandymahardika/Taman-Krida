@@ -12,6 +12,7 @@ import {
   listEvents,
   resetSampleEvents,
   sampleResetImages,
+  setEventCategory,
   setEventImage,
   toEvent,
   updateEvent,
@@ -66,6 +67,7 @@ export const createEvent = async (req: Request, res: Response) => {
     sold: quota !== null ? 0 : null,
     price: quota !== null ? priceOr(data.price, DEFAULT_PRICE) : null,
   });
+  if (data.category !== undefined) await setEventCategory(id, data.category);
   await logActivity('event', 'Acara baru ditambahkan', `${res.locals.user.name} · ${data.name}, ${shortDate(data.date)}`);
   res.status(201).json(toEvent((await findEventById(id))!));
 };
@@ -92,6 +94,7 @@ export const replaceEvent = async (req: Request<{ id: string }>, res: Response) 
     sold: quota !== null ? (current.sold ?? 0) : null,
     price: quota !== null ? priceOr(data.price, current.price ?? DEFAULT_PRICE) : null,
   });
+  if (data.category !== undefined) await setEventCategory(current.id, data.category);
   await logActivity('event', 'Agenda diperbarui', `${res.locals.user.name} · ${data.name}, ${shortDate(data.date)}`);
   res.json(toEvent((await findEventById(current.id))!));
 };

@@ -1,8 +1,12 @@
 import { useOverlay } from '@/components/overlay'
 import { mutate } from '@/lib/api'
+import { rupiah } from '@/data/format'
 
 /** Kalimat ringkas kapasitas + fungsi area. */
-export const describe = (a) => [a.capacity !== undefined && `Kapasitas ${a.capacity} orang`, a.purpose].filter(Boolean).join(' · ')
+export const describe = (a) =>
+  [a.capacity !== undefined && `Kapasitas ${a.capacity} orang`, a.purpose, a.bookable && (a.rentalRate !== undefined ? `Sewa ${rupiah(a.rentalRate)}` : 'Tarif sewa belum diisi')]
+    .filter(Boolean)
+    .join(' · ')
 
 /** Modal tambah/edit area fasilitas. Tanpa argumen = tambah area baru. */
 export function useFormArea() {
@@ -26,6 +30,20 @@ export function useFormArea() {
         { name: 'capacity', label: 'Kapasitas', type: 'number', min: 0, defaultValue: a?.capacity ?? '', placeholder: 'Jumlah orang (opsional)' },
         { name: 'purpose', label: 'Fungsi utama', defaultValue: a?.purpose, placeholder: 'Contoh: Pertunjukan tradisi', required: true },
         { name: 'note', label: 'Catatan', defaultValue: a?.note, placeholder: 'Opsional' },
+        ...(a?.bookable
+          ? [
+              {
+                name: 'rentalRate',
+                label: 'Tarif sewa per pemakaian (Rp)',
+                type: 'number',
+                min: 0,
+                step: 50000,
+                defaultValue: a.rentalRate ?? '',
+                required: true,
+                hint: 'Ditagihkan ke penyewa saat sewa disetujui dan tampil di menu Sewa Gedung aplikasi.',
+              },
+            ]
+          : []),
       ],
       onSubmit: (d) => (a ? mutate(`/facilities/${a.id}`, { method: 'PUT', body: d }) : mutate('/facilities', { method: 'POST', body: d })),
     })

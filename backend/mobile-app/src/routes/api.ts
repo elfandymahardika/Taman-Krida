@@ -43,6 +43,10 @@ router.get('/gallery/:id', info.getGalleryItem);
 router.get('/contents', info.getContents);
 router.get('/contents/:id', info.getContent);
 
+// Edukasi Budaya: materi yang dikelola admin di dashboard (hanya yang Terpublikasi)
+router.get('/culture', info.getCultureTopics);
+router.get('/culture/:id', info.getCultureTopic);
+
 router.get('/communities', communities.getCommunities);
 router.get('/communities/:id', communities.getCommunity);
 

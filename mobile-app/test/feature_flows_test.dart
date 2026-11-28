@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tkbj_mobile/app.dart';
+import 'package:tkbj_mobile/core/constants/app_assets.dart';
 import 'package:tkbj_mobile/core/utils/formatters.dart';
 import 'package:tkbj_mobile/data/datasources/demo/demo_data_source.dart';
 import 'package:tkbj_mobile/data/datasources/remote/api_client.dart';
+import 'package:tkbj_mobile/data/models/app_meta_model.dart';
+import 'package:tkbj_mobile/data/models/community_model.dart';
+import 'package:tkbj_mobile/data/models/culture_topic_model.dart';
+import 'package:tkbj_mobile/data/models/gallery_item_model.dart';
+import 'package:tkbj_mobile/domain/entities/culture_topic.dart';
+import 'package:tkbj_mobile/domain/entities/app_notification.dart';
 import 'package:tkbj_mobile/domain/entities/assistant_message.dart';
 import 'package:tkbj_mobile/domain/entities/rental_request.dart';
 import 'package:tkbj_mobile/domain/entities/ticket_order.dart';
 import 'package:tkbj_mobile/injection.dart';
+import 'package:tkbj_mobile/presentation/pages/education/video_player_screen.dart';
 import 'package:tkbj_mobile/presentation/routes/app_routes.dart';
 import 'package:tkbj_mobile/presentation/widgets/interactive/chip_filter.dart';
 
@@ -114,39 +122,46 @@ void main() {
     expect(state.notification.unreadCount, unreadBefore + 3);
   });
 
-  test('tiket gratis langsung lunas; gratis & berbayar dipesan terpisah', () async {
-    final state = await signedInState();
-    final events = state.catalog.events;
-    final free = events.firstWhere((e) => e.id == 'pameran-batik-kriya');
-    final walkIn = events.firstWhere((e) => e.id == 'malang-djadoel-3');
-    expect(free.isFreeTicket, isTrue, reason: 'kuota diisi + harga 0');
-    expect(walkIn.isTicketed, isFalse, reason: 'kuota kosong = datang langsung');
-    expect(state.catalog.ticketedEvents.map((e) => e.id), contains(free.id));
-    expect(
-      state.catalog.ticketedEvents.map((e) => e.id),
-      isNot(contains(walkIn.id)),
-    );
+  test(
+    'tiket gratis langsung lunas; gratis & berbayar dipesan terpisah',
+    () async {
+      final state = await signedInState();
+      final events = state.catalog.events;
+      final free = events.firstWhere((e) => e.id == 'pameran-batik-kriya');
+      final walkIn = events.firstWhere((e) => e.id == 'malang-djadoel-3');
+      expect(free.isFreeTicket, isTrue, reason: 'kuota diisi + harga 0');
+      expect(
+        walkIn.isTicketed,
+        isFalse,
+        reason: 'kuota kosong = datang langsung',
+      );
+      expect(state.catalog.ticketedEvents.map((e) => e.id), contains(free.id));
+      expect(
+        state.catalog.ticketedEvents.map((e) => e.id),
+        isNot(contains(walkIn.id)),
+      );
 
-    state.ticket
-      ..saveBuyer(
-        const BuyerInfo(
-          name: 'Budi Santoso',
-          email: 'budi.santoso@email.com',
-          phone: '081234567890',
-        ),
-      )
-      ..setQuantity(free.id, 2)
-      ..setQuantity('wayang-bima-bungkus', 1);
-    expect(state.ticket.isCartMixed, isTrue);
-    await expectLater(state.ticket.placeOrder(), throwsA(anything));
+      state.ticket
+        ..saveBuyer(
+          const BuyerInfo(
+            name: 'Budi Santoso',
+            email: 'budi.santoso@email.com',
+            phone: '081234567890',
+          ),
+        )
+        ..setQuantity(free.id, 2)
+        ..setQuantity('wayang-bima-bungkus', 1);
+      expect(state.ticket.isCartMixed, isTrue);
+      await expectLater(state.ticket.placeOrder(), throwsA(anything));
 
-    state.ticket.setQuantity('wayang-bima-bungkus', 0);
-    expect(state.ticket.isCartFree, isTrue);
-    final order = await state.ticket.placeOrder();
-    expect(order.status, PaymentStatus.paid);
-    expect(order.total, 0);
-    expect(order.lines.single.ticketCodes, hasLength(2));
-  });
+      state.ticket.setQuantity('wayang-bima-bungkus', 0);
+      expect(state.ticket.isCartFree, isTrue);
+      final order = await state.ticket.placeOrder();
+      expect(order.status, PaymentStatus.paid);
+      expect(order.total, 0);
+      expect(order.lines.single.ticketCodes, hasLength(2));
+    },
+  );
 
   testWidgets('alur ambil tiket gratis tanpa layar pembayaran', (tester) async {
     final state = await signedInState();
@@ -335,6 +350,202 @@ void main() {
     expect(state.notification.unreadCount, 0);
     expect(find.text('2 baru'), findsNothing);
   });
+
+  test('materi edukasi dari dashboard: foto bawaan, unggahan, tanpa foto', () {
+    final topic = CultureTopicModel.fromJson({
+      'id': 'tari-remo',
+      'title': 'Tari Remo',
+      'category': 'Tari',
+      'summary': 'Tari penyambutan khas Jawa Timur.',
+      'headline': 'Tari pembuka pertunjukan ludruk.',
+      'readMinutes': 6,
+      'history': 'Tari Remo berasal dari Jombang.',
+      'timelineTitle': 'Linimasa',
+      'timeline': [
+        {'label': '1950', 'text': 'Mulai dipentaskan.'},
+      ],
+      'philosophy': [
+        {'symbol': '◆', 'title': 'Gerak kaki', 'text': 'Keberanian.'},
+      ],
+      'photos': ['wayang', 'https://cdn.tkbj.test/remo.jpg', 'tidak-dikenal'],
+      'videoMinutes': 0,
+      'video': {'url': 'https://youtu.be/abc', 'type': 'youtube'},
+    });
+    expect(topic.video?.type, CultureVideoType.youtube);
+    expect(topic.video?.playsInApp, isFalse);
+    expect(topic.photos, [
+      AppImages.acaraWayang,
+      'https://cdn.tkbj.test/remo.jpg',
+    ]);
+    expect(topic.imageAsset, AppImages.acaraWayang);
+    expect(topic.timeline.single.label, '1950');
+    expect(topic.philosophy.single.title, 'Gerak kaki');
+    expect(
+      CultureTopicModel.fromJson({'id': 'x', 'title': 'X', 'category': 'Musik'})
+          .imageAsset,
+      '',
+    );
+  });
+
+  test('kategori Edukasi mengikuti materi yang terbit', () async {
+    final state = AppContainer.demo(source: _CultureDataSource());
+    await state.init();
+    expect(state.education.categories, ['Semua', 'Tari']);
+    expect(state.education.topicById('tari-remo')?.title, 'Tari Remo');
+  });
+
+  testWidgets('video berkas dari dashboard diputar di layar pemutar', (
+    tester,
+  ) async {
+    final state = AppContainer.demo(source: _CultureDataSource());
+    await _open(tester, state, AppRoutes.education);
+    await _tapText(tester, 'Tari Remo');
+    await _tapText(tester, 'Foto / Video');
+    expect(find.text('Video dokumenter · 4 menit'), findsOneWidget);
+    await _tapText(tester, 'Video dokumenter · 4 menit');
+    expect(find.byType(VideoPlayerScreen), findsOneWidget);
+  });
+
+  testWidgets('Beranda menampilkan banner & kabar dari menu Konten', (
+    tester,
+  ) async {
+    final state = AppContainer.demo(pickFile: fakePick);
+    await _open(tester, state, AppRoutes.home);
+    expect(find.text('Pekan Wayang Oktober di TKBJ'), findsOneWidget);
+    expect(find.text('Kabar TKBJ'), findsOneWidget);
+    await _tapText(tester, 'Mengenal Topeng Malangan dan tokoh Panji');
+    expect(find.text('Artikel budaya'), findsOneWidget);
+    expect(
+      find.text('Kisah Panji dan makna warna topeng Malangan.'),
+      findsOneWidget,
+    );
+  });
+
+  test('profil lembaga, komunitas, dan video galeri dari dashboard', () {
+    final meta = AppMetaModel.fromJson({
+      'today': '2026-06-01',
+      'eventCategories': ['Wayang'],
+      'communityCategories': ['Seni musik'],
+      'tickets': {'maxPerEvent': 4, 'payDeadlineHours': 24},
+      'bankAccount': {'bank': 'Bank Jatim', 'account': '001'},
+      'profile': {'hours': 'Setiap hari · 08.00–20.00 WIB', 'about': ''},
+    });
+    expect(meta.profile.hours, 'Setiap hari · 08.00–20.00 WIB');
+    expect(meta.profile.address, isNotEmpty, reason: 'kolom kosong → bawaan');
+
+    final community = CommunityModel.fromJson({
+      'id': 'sanggar',
+      'name': 'Sanggar Uji',
+      'category': 'Seni musik',
+      'city': 'Malang',
+      'members': 12,
+      'contact': '0812',
+      'description': 'Deskripsi dari admin.',
+      'address': 'Jl. Uji 1',
+      'schedule': [
+        {'day': 'Sabtu', 'time': '15.00–17.00'},
+      ],
+      'performances': '12 pentas',
+    });
+    expect(community.about, 'Deskripsi dari admin.');
+    expect(community.schedule, [('Sabtu', '15.00–17.00')]);
+    expect(community.performances, '12 pentas');
+    expect(community.address, 'Jl. Uji 1');
+
+    final media = [
+      {
+        'id': 'v1',
+        'title': 'Video Wayang',
+        'collection': 'Wayang',
+        'date': '2026-05-01',
+        'type': 'Video',
+        'url': 'https://cdn.tkbj.test/wayang.mp4',
+        'credit': 'Tim TKBJ',
+      },
+      {
+        'id': 'f1',
+        'title': 'Foto Wayang',
+        'collection': 'Wayang',
+        'date': '2026-05-01',
+        'type': 'Foto',
+        'url': 'https://cdn.tkbj.test/wayang.jpg',
+        'credit': 'Tim TKBJ',
+      },
+    ];
+    final video = GalleryItemModel.fromJson(media[0], media);
+    expect(video.videos, ['https://cdn.tkbj.test/wayang.mp4']);
+    expect(video.photos, ['https://cdn.tkbj.test/wayang.jpg']);
+    expect(GalleryItemModel.fromJson(media[1], media).videos, hasLength(1));
+  });
+
+  testWidgets('akun dinonaktifkan admin: keluar otomatis & alasannya tampil', (
+    tester,
+  ) async {
+    final source = _DisabledAccountDataSource();
+    final state = AppContainer.demo(source: source, pickFile: fakePick);
+    await state.init();
+    await state.auth.login('budi.santoso@email.com', 'tkbj2026');
+    expect(state.auth.isLoggedIn, isTrue);
+
+    // Admin menonaktifkan akun → permintaan berikutnya ditolak 401.
+    source.disabled = true;
+    await state.auth.refreshAccount();
+    expect(state.auth.isLoggedIn, isFalse);
+
+    await _open(tester, state, AppRoutes.login);
+    expect(
+      find.textContaining('dinonaktifkan oleh pengelola TKBJ'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Edukasi menampilkan pesan & tombol coba lagi saat gagal', (
+    tester,
+  ) async {
+    // Gagal saat aplikasi dibuka dan saat layar Edukasi memuat ulang.
+    final source = _CultureDataSource(failures: 2);
+    final state = AppContainer.demo(source: source);
+    await _open(tester, state, AppRoutes.education);
+    expect(find.text('Gagal memuat data'), findsOneWidget);
+    await _tapText(tester, 'Coba Lagi');
+    expect(find.text('Tari Remo'), findsOneWidget);
+  });
+}
+
+/// Server berisi satu materi edukasi buatan admin; [failures] = jumlah
+/// permintaan pertama yang gagal (server mati).
+class _CultureDataSource extends DemoDataSource {
+  _CultureDataSource({this.failures = 0});
+
+  final int failures;
+  int calls = 0;
+
+  @override
+  Future<List<CultureTopic>> cultureTopics() async {
+    if (calls++ < failures) {
+      throw const ApiException(0, 'Tidak dapat terhubung ke server.');
+    }
+    return const [
+      CultureTopic(
+        id: 'tari-remo',
+        title: 'Tari Remo',
+        category: 'Tari',
+        summary: 'Tari penyambutan khas Jawa Timur.',
+        headline: 'Tari pembuka pertunjukan ludruk.',
+        readMinutes: 6,
+        history: 'Tari Remo berasal dari Jombang.',
+        timelineTitle: 'Linimasa',
+        timeline: [],
+        philosophy: [],
+        photos: [],
+        videoMinutes: 4,
+        video: CultureVideo(
+          'https://cdn.tkbj.test/remo.mp4',
+          CultureVideoType.file,
+        ),
+      ),
+    ];
+  }
 }
 
 /// Data source demo yang gagal pada pertanyaan pertama ke Tanya Krida.
@@ -349,5 +560,22 @@ class _FlakyAssistantDataSource extends DemoDataSource {
       throw const ApiException(503, 'Server AI sedang sibuk.');
     }
     return super.askAssistant(history);
+  }
+}
+
+/// Akun yang dinonaktifkan admin di dashboard saat aplikasi sedang dipakai.
+class _DisabledAccountDataSource extends DemoDataSource {
+  bool disabled = false;
+
+  @override
+  Future<List<AppNotification>> notifications() {
+    if (disabled) {
+      throw const ApiException(
+        401,
+        'Akun Anda dinonaktifkan oleh pengelola TKBJ. Hubungi TKBJ untuk '
+        'informasi lebih lanjut.',
+      );
+    }
+    return super.notifications();
   }
 }

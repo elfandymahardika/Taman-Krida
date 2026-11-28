@@ -59,7 +59,9 @@ export const PAGE_MODULE: Record<string, ModuleKey> = {
   '/galeri': 'info',
   '/komunitas': 'info',
   '/konten': 'info',
+  '/edukasi': 'info',
   '/pengguna': 'admin',
+  '/pengunjung': 'admin',
   '/pengaturan': 'admin',
 };
 

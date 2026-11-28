@@ -70,7 +70,7 @@ export default function DaftarAcara({ events, page, onPage, published, drafts }:
             <TableFoot page={safePage} pages={pages} onPage={onPage}>
               Menampilkan {pageRows.length} dari {events.length} acara ·{' '}
               <button className="link link--sm" onClick={resetSample}>
-                Pulihkan data contoh
+                Pulihkan data awal
               </button>
             </TableFoot>
           </>

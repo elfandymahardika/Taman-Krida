@@ -6,14 +6,15 @@ import '../../../domain/entities/culture_topic.dart';
 import '../../routes/app_routes.dart';
 import '../../controllers/controllers.dart';
 import '../../widgets/common/app_button.dart';
-import '../../widgets/common/app_feedback.dart';
 import '../../widgets/common/artwork_image.dart';
+import '../../widgets/common/open_external.dart';
 import '../../widgets/common/section_card.dart';
 import '../../widgets/common/video_preview.dart';
 import '../../widgets/interactive/underline_tabs.dart';
 import '../../widgets/layout/content_section.dart';
 import '../../widgets/layout/responsive_grid.dart';
 import '../../widgets/layout/tkbj_scaffold.dart';
+import 'video_player_screen.dart';
 
 /// Detail materi edukasi dengan tab Sejarah (node 157:2386), Filosofi
 /// (157:2453), dan Foto/Video (157:2534).
@@ -27,14 +28,29 @@ class EducationDetailScreen extends StatefulWidget {
 }
 
 class _EducationDetailScreenState extends State<EducationDetailScreen> {
-  late final CultureTopic _topic = context
-      .read<EducationController>()
-      .topicById(widget.args.topicId)!;
   late int _tab = widget.args.initialTab;
 
   @override
   Widget build(BuildContext context) {
-    final topic = _topic;
+    final topic = context.watch<EducationController>().topicById(
+      widget.args.topicId,
+    );
+    // Materi bisa ditarik admin saat layar ini terbuka.
+    if (topic == null) {
+      return TkbjScaffold(
+        title: 'Materi tidak tersedia',
+        subtitle: 'Materi ini sudah tidak diterbitkan.',
+        children: [
+          ContentSection(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+            child: AppButton(
+              label: 'Lihat Materi Lain',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ),
+        ],
+      );
+    }
 
     return TkbjScaffold(
       title: topic.title,
@@ -164,28 +180,58 @@ class _EducationDetailScreenState extends State<EducationDetailScreen> {
     ],
   ];
 
+  /// Berkas video diputar di aplikasi; YouTube/tautan lain dibuka di luar.
+  void _playVideo(CultureTopic topic, CultureVideo video) {
+    if (video.playsInApp) {
+      Navigator.of(context).pushNamed(
+        AppRoutes.videoPlayer,
+        arguments: VideoArgs(url: video.url, title: topic.title),
+      );
+    } else {
+      openExternal(context, video.url);
+    }
+  }
+
+  static String _videoCaption(CultureTopic topic, CultureVideo video) {
+    final minutes = topic.videoMinutes > 0
+        ? ' · ${topic.videoMinutes} menit'
+        : '';
+    return switch (video.type) {
+      CultureVideoType.file => 'Video dokumenter$minutes',
+      CultureVideoType.youtube => 'Tonton di YouTube$minutes',
+      CultureVideoType.link => 'Buka video$minutes',
+    };
+  }
+
   List<Widget> _mediaTab(CultureTopic topic) => [
     Text('Dokumentasi', style: AppText.playfair(18)),
-    const SizedBox(height: 16),
-    SizedBox(
-      height: 190,
-      child: VideoPreview(
-        cover: topic.photos.first,
-        minutes: topic.videoMinutes,
-        caption: 'Video dokumenter · ${topic.videoMinutes} menit',
-        onPlay: () =>
-            showAppToast(context, 'Pemutar video (simulasi prototype).'),
+    if (topic.video case final video?) ...[
+      const SizedBox(height: 16),
+      SizedBox(
+        height: 190,
+        child: VideoPreview(
+          cover: topic.imageAsset,
+          minutes: topic.videoMinutes,
+          caption: _videoCaption(topic, video),
+          onPlay: () => _playVideo(topic, video),
+        ),
       ),
-    ),
+    ],
     const SizedBox(height: 16),
-    ResponsiveGrid(
-      spacing: 10,
-      minItemWidth: 140,
-      maxColumns: 4,
-      children: [
-        for (final photo in topic.photos)
-          ArtworkImage(photo, height: 120, radius: 10, cacheWidth: 400),
-      ],
-    ),
+    if (topic.photos.isEmpty)
+      Text(
+        'Belum ada foto dokumentasi untuk materi ini.',
+        style: AppText.poppins(12, color: AppColors.muted),
+      )
+    else
+      ResponsiveGrid(
+        spacing: 10,
+        minItemWidth: 140,
+        maxColumns: 4,
+        children: [
+          for (final photo in topic.photos)
+            ArtworkImage(photo, height: 120, radius: 10, cacheWidth: 400),
+        ],
+      ),
   ];
 }

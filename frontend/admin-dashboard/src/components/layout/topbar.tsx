@@ -55,7 +55,6 @@ export default function Topbar({ title, onMenu }: { title: string; onMenu: () =>
       </div>
       <div className="topbar__right">
         <Pencarian />
-        <span className="badge badge--primary data-flag">Data contoh</span>
         <Notifikasi />
         <div className="topbar__sep" />
         <button className="account" onClick={openAccount}>

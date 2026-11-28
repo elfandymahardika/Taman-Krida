@@ -12,6 +12,7 @@ class AppMetaModel extends AppMeta {
     required super.payDeadlineHours,
     required super.bank,
     required super.account,
+    super.profile,
   });
 
   factory AppMetaModel.fromJson(Json json) {
@@ -25,6 +26,27 @@ class AppMetaModel extends AppMeta {
       payDeadlineHours: tickets['payDeadlineHours'] as int,
       bank: bank['bank'] as String,
       account: bank['account'] as String,
+      profile: _profile(json['profile']),
+    );
+  }
+
+  /// Profil lembaga dari dashboard; kolom kosong memakai isi bawaan.
+  static InstitutionProfile _profile(Object? json) {
+    const d = InstitutionProfile.fallback;
+    if (json is! Json) return d;
+    String text(String key, String fallback) {
+      final value = (json[key] as String?)?.trim() ?? '';
+      return value.isEmpty ? fallback : value;
+    }
+
+    return InstitutionProfile(
+      name: text('name', d.name),
+      manager: text('manager', d.manager),
+      address: text('address', d.address),
+      phone: text('phone', d.phone),
+      whatsapp: text('whatsapp', ''),
+      hours: text('hours', d.hours),
+      about: text('about', d.about),
     );
   }
 }

@@ -94,7 +94,7 @@ export default function LoginForm({ from }: { from: string }) {
 
       </form>
       <p className="muted" style={{ fontSize: 11, textAlign: 'center' }}>
-        © 2026 TKBJ • Prototipe — data contoh dari backend TKBJ Admin API.
+        © 2026 TKBJ • Disbudpar Provinsi Jawa Timur
       </p>
     </main>
   )

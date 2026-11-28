@@ -15,6 +15,8 @@ export { EMAIL_RE, USERNAME_RE };
 
 export const VENUES = ['Pendopo Agung TKBJ', 'Panggung Terbuka', 'Gedung Kesenian & Galeri'];
 export const EVENT_STATUSES = ['Terpublikasi', 'Draf'];
+/** Kategori filter Kalender di aplikasi (sama dengan EVENT_CATEGORIES backend mobile). Kosong = otomatis dari nama. */
+export const EVENT_CATEGORIES = ['Wayang', 'Tari', 'Ketoprak', 'Musik', 'Pameran', 'Lainnya'];
 export const CONTENT_TYPES = ['Banner beranda', 'Berita', 'Pengumuman', 'Artikel budaya'];
 export const CONTENT_STATUSES = ['Terpublikasi', 'Terjadwal', 'Draf'];
 
@@ -90,11 +92,13 @@ export const validateEvent = validate((body) => {
   else if (body.start && body.end <= body.start) errors.end = 'Jam selesai harus setelah jam mulai.';
   if (!VENUES.includes(body.venue)) errors.venue = 'Pilih lokasi yang tersedia.';
   if (body.status !== undefined && !EVENT_STATUSES.includes(body.status)) errors.status = 'Status publikasi tidak dikenal.';
+  const category = body.category === undefined ? undefined : str(body.category) || null;
+  if (category && !EVENT_CATEGORIES.includes(category)) errors.category = 'Kategori acara tidak dikenal.';
   const quota = parseQuota(body.quota);
   if (quota !== null && (!Number.isInteger(quota) || quota < 0)) errors.quota = 'Kuota harus bilangan bulat ≥ 0.';
   if (body.price !== undefined && body.price !== '' && (!Number.isInteger(Number(body.price)) || Number(body.price) < 0))
     errors.price = 'Harga harus bilangan bulat ≥ 0.';
-  return { data: { name, organizer: str(body.organizer) }, errors };
+  return { data: { name, organizer: str(body.organizer), category }, errors };
 });
 
 /**
@@ -166,6 +170,87 @@ const contentRules = (partial: boolean) =>
 
 export const validateContent = contentRules(false);
 export const validateContentUpdate = contentRules(true);
+
+/**
+ * Validasi materi Edukasi Budaya (tambah & edit; selalu lengkap). Linimasa dan filosofi dikirim
+ * sebagai array objek. Hasil bersih → req.body.culture.
+ */
+export const CULTURE_STATUSES = ['Terpublikasi', 'Draf'];
+export const MAX_CULTURE_POINTS = 10;
+
+/** Bilangan bulat dalam rentang; selain itu null. */
+const intIn = (v: unknown, min: number, max: number) => {
+  const n = typeof v === 'number' ? v : isString(v) && v.trim() ? Number(v) : NaN;
+  return Number.isInteger(n) && n >= min && n <= max ? n : null;
+};
+
+/** Daftar poin linimasa/filosofi: tiap objek diambil kolom teksnya saja; pesan error pertama dikembalikan. */
+function points<K extends string>(value: unknown, keys: Record<K, { label: string; min: number; max: number }>, what: string) {
+  if (!Array.isArray(value)) return { list: [], error: `${what} tidak valid.` };
+  if (value.length > MAX_CULTURE_POINTS) return { list: [], error: `${what} maksimal ${MAX_CULTURE_POINTS} baris.` };
+  const list = value.map((item) => {
+    const row = {} as Record<K, string>;
+    for (const k of Object.keys(keys) as K[]) row[k] = text(item?.[k]);
+    return row;
+  });
+  for (const [i, row] of list.entries()) {
+    for (const [k, rule] of Object.entries(keys) as [K, { label: string; min: number; max: number }][]) {
+      const len = row[k].length;
+      if (len < rule.min || len > rule.max)
+        return { list, error: `Baris ${i + 1}: ${rule.label} ${rule.min ? `${rule.min}–` : 'maksimal '}${rule.max} karakter.` };
+    }
+  }
+  return { list, error: null };
+}
+
+export function checkCulture(body: Record<string, any>) {
+  const errors: FieldErrors = {};
+  const out = {
+    title: text(body.title),
+    category: text(body.category),
+    summary: text(body.summary),
+    headline: text(body.headline),
+    readMinutes: intIn(body.readMinutes, 1, 60),
+    history: str(body.history),
+    timelineTitle: text(body.timelineTitle) || 'Linimasa',
+    videoMinutes: intIn(body.videoMinutes ?? 0, 0, 180),
+    status: body.status ?? 'Draf',
+  };
+  const len = (k: keyof typeof out, label: string, min: number, max: number) => {
+    const v = String(out[k]);
+    if (!v) errors[k] = `${label} wajib diisi.`;
+    else if (v.length < min) errors[k] = `${label} minimal ${min} karakter.`;
+    else if (v.length > max) errors[k] = `${label} maksimal ${max} karakter.`;
+  };
+  len('title', 'Judul', 3, 80);
+  len('category', 'Kategori', 3, 40);
+  len('summary', 'Ringkasan', 10, 200);
+  len('headline', 'Kalimat pembuka', 10, 200);
+  len('history', 'Sejarah', 20, 5000);
+  len('timelineTitle', 'Judul linimasa', 3, 60);
+  if (out.readMinutes === null) errors.readMinutes = 'Lama baca 1–60 menit.';
+  if (out.videoMinutes === null) errors.videoMinutes = 'Durasi video 0–180 menit.';
+  if (!CULTURE_STATUSES.includes(out.status)) errors.status = 'Status tidak dikenal.';
+
+  const timeline = points(body.timeline, { label: { label: 'label', min: 1, max: 20 }, text: { label: 'keterangan', min: 3, max: 200 } }, 'Linimasa');
+  if (timeline.error) errors.timeline = timeline.error;
+  const philosophy = points(
+    body.philosophy,
+    { symbol: { label: 'simbol', min: 0, max: 4 }, title: { label: 'judul', min: 2, max: 60 }, text: { label: 'makna', min: 3, max: 200 } },
+    'Filosofi',
+  );
+  if (philosophy.error) errors.philosophy = philosophy.error;
+
+  const culture = {
+    ...out,
+    timeline: timeline.list,
+    // Simbol kosong diganti simbol bawaan agar kartu filosofi di aplikasi tetap rapi.
+    philosophy: philosophy.list.map((p) => ({ ...p, symbol: p.symbol || '◆' })),
+  };
+  return { data: { culture }, errors };
+}
+
+export const validateCulture = validate(checkCulture);
 
 /**
  * Validasi metadata media galeri

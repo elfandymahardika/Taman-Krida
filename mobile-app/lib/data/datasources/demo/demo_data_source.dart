@@ -8,24 +8,28 @@ import '../../../domain/entities/app_notification.dart';
 import '../../../domain/entities/assistant_message.dart';
 import '../../../domain/entities/community.dart';
 import '../../../domain/entities/cultural_event.dart';
+import '../../../domain/entities/culture_topic.dart';
 import '../../../domain/entities/facility.dart';
 import '../../../domain/entities/gallery_item.dart';
+import '../../../domain/entities/news_item.dart';
 import '../../../domain/entities/rental_request.dart';
 import '../../../domain/entities/ticket_order.dart';
 import '../../../domain/entities/user_account.dart';
 import '../../models/user_model.dart';
-import '../local/culture_data.dart';
 import '../remote/api_client.dart';
 import '../remote/assistant_remote_data_source.dart';
 import '../remote/auth_remote_data_source.dart';
 import '../remote/catalog_remote_data_source.dart';
 import '../remote/community_remote_data_source.dart';
+import '../remote/culture_remote_data_source.dart';
 import '../remote/notification_remote_data_source.dart';
 import '../remote/rental_remote_data_source.dart';
 import '../remote/ticket_remote_data_source.dart';
 import 'seed/community_data.dart';
+import 'seed/culture_data.dart';
 import 'seed/dummy_data.dart';
 import 'seed/gallery_data.dart';
+import 'seed/home_data.dart';
 import 'seed/notification_data.dart';
 
 /// Server tiruan di memori: dipakai test dan mode presentasi offline
@@ -41,6 +45,7 @@ class DemoDataSource
         TicketRemoteDataSource,
         RentalRemoteDataSource,
         CommunityRemoteDataSource,
+        CultureRemoteDataSource,
         NotificationRemoteDataSource,
         AssistantRemoteDataSource {
   /// [today] bawaan = 1 Juni 2026, tanggal desain prototipe, agar agenda
@@ -121,8 +126,12 @@ class DemoDataSource
       payDeadlineHours: 24,
       bank: 'Bank Jatim',
       account: '0011 2233 4455 (contoh)',
+      profile: HomeData.profile,
     ),
   );
+
+  @override
+  Future<List<NewsItem>> news() => _ok(HomeData.news);
 
   @override
   Future<List<CulturalEvent>> events() => _ok(DummyData.events);
@@ -135,6 +144,9 @@ class DemoDataSource
 
   @override
   Future<List<GalleryItem>> gallery() => _ok(GalleryData.items);
+
+  @override
+  Future<List<CultureTopic>> cultureTopics() => _ok(CultureData.topics);
 
   /// Slot penuh: agenda contoh (pola tetap) atau pengajuan sewa yang berlaku.
   bool _slotTaken(Facility facility, DateTime date, RentalSlot slot) {
@@ -513,7 +525,6 @@ class DemoDataSource
     await Future<void>.delayed(const Duration(milliseconds: 400));
     final q = history.last.text.toLowerCase();
     bool has(List<String> words) => words.any(q.contains);
-    const note = '\n\n(Mode demo: jawaban contoh tanpa AI.)';
 
     AssistantMessage reply(
       String text, {
@@ -521,7 +532,7 @@ class DemoDataSource
       List<String> suggestions = const [],
     }) => AssistantMessage(
       role: ChatRole.assistant,
-      text: '$text$note',
+      text: text,
       links: links,
       suggestions: suggestions,
     );
@@ -654,7 +665,11 @@ class DemoDataSource
       final shown = upcoming.take(3).toList();
       return reply(
         'Acara ${category ?? 'terdekat'} di TKBJ:\n'
-        '${[for (final e in shown) '• ${e.title}, ${Formatters.longDate(e.date)} pukul ${e.startTime} di ${e.venueShort}${e.price > 0 ? ' (${Formatters.rupiah(e.price)})' : e.isFreeTicket ? ' (gratis, ambil tiket)' : ' (gratis, datang langsung)'}'].join('\n')}',
+        '${[for (final e in shown) '• ${e.title}, ${Formatters.longDate(e.date)} pukul ${e.startTime} di ${e.venueShort}${e.price > 0
+              ? ' (${Formatters.rupiah(e.price)})'
+              : e.isFreeTicket
+              ? ' (gratis, ambil tiket)'
+              : ' (gratis, datang langsung)'}'].join('\n')}',
         links: [
           for (final e in shown.take(2))
             AssistantLink(

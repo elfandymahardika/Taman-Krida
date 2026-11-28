@@ -168,10 +168,17 @@ class AccountScreen extends StatelessWidget {
                   symbol: '?',
                   title: 'Bantuan & Kontak',
                   subtitle: 'Hubungi pengelola TKBJ',
-                  onTap: () => showAppToast(
-                    context,
-                    'Hubungi TKBJ: (0341) 471509 · Instagram @disbudparjatimprov',
-                  ),
+                  onTap: () {
+                    // Kontak dari Profil lembaga di dashboard.
+                    final profile = context.read<CatalogController>().profile;
+                    final wa = profile.whatsapp.isEmpty
+                        ? ''
+                        : ' · WA ${profile.whatsapp}';
+                    showAppToast(
+                      context,
+                      'Hubungi TKBJ: ${profile.phone}$wa · ${profile.hours}',
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 AppButton.outline(

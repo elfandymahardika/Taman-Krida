@@ -32,7 +32,9 @@ export const PAGE_MODULE: Record<string, Module> = {
   '/galeri': 'info',
   '/komunitas': 'info',
   '/konten': 'info',
+  '/edukasi': 'info',
   '/pengguna': 'admin',
+  '/pengunjung': 'admin',
   '/pengaturan': 'admin',
 }
 

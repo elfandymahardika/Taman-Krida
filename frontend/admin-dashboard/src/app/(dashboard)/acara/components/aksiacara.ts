@@ -39,6 +39,6 @@ export function useAksiAcara() {
         success: 'Acara berhasil dihapus',
         onPrimary: () => eventStore.remove(e.id),
       }),
-    resetSample: () => run(eventStore.reset, 'Data contoh acara dipulihkan'),
+    resetSample: () => run(eventStore.reset, 'Data awal acara dipulihkan'),
   }
 }

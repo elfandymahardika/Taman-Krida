@@ -3,6 +3,7 @@ import '../../domain/entities/community.dart';
 import '../../domain/entities/cultural_event.dart';
 import '../../domain/entities/facility.dart';
 import '../../domain/entities/gallery_item.dart';
+import '../../domain/entities/news_item.dart';
 import '../../domain/repositories/catalog_repository.dart';
 import '../datasources/remote/catalog_remote_data_source.dart';
 import 'guard.dart';
@@ -26,4 +27,7 @@ class CatalogRepositoryImpl implements CatalogRepository {
 
   @override
   Future<List<GalleryItem>> getGallery() => guard(_remote.gallery);
+
+  @override
+  Future<List<NewsItem>> getNews() => guard(_remote.news);
 }

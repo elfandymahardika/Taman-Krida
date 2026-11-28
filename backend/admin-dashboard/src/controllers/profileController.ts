@@ -39,6 +39,8 @@ async function validateFacility(body: Record<string, any>, current?: Facility) {
     capacity: body.capacity === '' || body.capacity == null ? null : Number(body.capacity),
     purpose: str(body.purpose),
     note: str(body.note) || null,
+    // Tarif sewa hanya untuk area yang dipakai sewa (bookable); dikirim sebagai angka Rp.
+    rentalRate: current?.bookable && body.rentalRate !== undefined ? Number(body.rentalRate) : undefined,
   };
   const errors: FieldErrors = {};
   if (current?.bookable && f.name !== current.name) errors.name = 'Nama fasilitas yang dipakai acara & sewa tidak dapat diubah.';
@@ -46,6 +48,8 @@ async function validateFacility(body: Record<string, any>, current?: Facility) {
   else if (await facilityNameTaken(f.name, current?.id)) errors.name = 'Area dengan nama ini sudah ada.';
   if (f.capacity !== null && (!Number.isInteger(f.capacity) || f.capacity < 0)) errors.capacity = 'Kapasitas harus bilangan bulat ≥ 0.';
   if (!f.purpose) errors.purpose = 'Fungsi utama wajib diisi.';
+  if (f.rentalRate !== undefined && (!Number.isInteger(f.rentalRate) || f.rentalRate < 0 || f.rentalRate > 1_000_000_000))
+    errors.rentalRate = 'Tarif sewa harus bilangan bulat Rp0–Rp1.000.000.000.';
   assertValid(errors);
   return f;
 }

@@ -22,6 +22,8 @@ export interface Event {
   photo: string | null;
   /** Gambar unggahan admin (nama berkas / URL Vercel Blob); diutamakan daripada `photo`. */
   image: string | null;
+  /** Kategori pilihan admin; null = ditebak dari nama. */
+  category: string | null;
   updated_at: string;
   /** Tiket dalam pesanan yang belum lunas tapi masih menahan kursi (lihat reservedSql). */
   reserved: number;
@@ -52,7 +54,7 @@ export const toEvent = (e: Event) => ({
   id: e.id,
   name: e.name,
   short: e.short,
-  category: eventCategory(e.name),
+  category: e.category || eventCategory(e.name),
   organizer: e.organizer,
   date: e.date,
   start: hhmm(e.start_time),

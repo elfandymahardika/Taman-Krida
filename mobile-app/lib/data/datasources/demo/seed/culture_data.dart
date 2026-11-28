@@ -1,10 +1,11 @@
-import '../../../core/constants/app_assets.dart';
-import '../../../domain/entities/culture_topic.dart';
+import '../../../../core/constants/app_assets.dart';
+import '../../../../domain/entities/culture_topic.dart';
 
-/// Materi Edukasi Budaya. Materi Wayang Kulit mengikuti desain Figma.
+/// Materi Edukasi Budaya contoh (mode demo & test). Di aplikasi sungguhan materi
+/// dikelola admin di dashboard → Edukasi; isi awalnya sama dengan data ini
+/// (migration backend/admin-dashboard/prisma/migrations/3_culture_topics).
+/// Materi Wayang Kulit mengikuti desain Figma.
 abstract final class CultureData {
-  static const categories = ['Semua', 'Pertunjukan', 'Musik', 'Arsitektur'];
-
   static const topics = <CultureTopic>[
     CultureTopic(
       id: 'wayang-kulit',
@@ -13,7 +14,6 @@ abstract final class CultureData {
       summary: 'Kisah, tokoh, dan makna bayangan di balik kelir.',
       headline: 'Seni pertunjukan bayangan warisan budaya dunia dari Jawa.',
       readMinutes: 8,
-      imageAsset: AppImages.acaraWayang,
       history:
           'Wayang kulit telah dikenal di Jawa sejak abad ke-10 dan berkembang '
           'menjadi media dakwah, pendidikan, dan hiburan. Di Jawa Timur, gaya '
@@ -62,7 +62,7 @@ abstract final class CultureData {
         AppImages.gamelan,
         AppImages.fasilitasPendopo,
       ],
-      videoMinutes: 12,
+      videoMinutes: 0,
     ),
     CultureTopic(
       id: 'tari-topeng-malangan',
@@ -71,7 +71,6 @@ abstract final class CultureData {
       summary: 'Karakter topeng Panji dan gerak khas Malang.',
       headline: 'Tari bertopeng khas Malang yang membawakan kisah Panji.',
       readMinutes: 6,
-      imageAsset: AppImages.acaraTopeng,
       history:
           'Topeng Malangan berkembang di desa-desa sekitar Malang dan '
           'membawakan cerita Panji, kisah Raden Panji dan Dewi Sekartaji. '
@@ -121,7 +120,7 @@ abstract final class CultureData {
         AppImages.fasilitasPendopo,
         AppImages.gamelan,
       ],
-      videoMinutes: 9,
+      videoMinutes: 0,
     ),
     CultureTopic(
       id: 'ketoprak',
@@ -130,7 +129,6 @@ abstract final class CultureData {
       summary: 'Teater rakyat dengan cerita sejarah & humor.',
       headline: 'Teater tradisional Jawa yang memadukan cerita dan gamelan.',
       readMinutes: 5,
-      imageAsset: AppImages.acaraKetoprak,
       history:
           'Ketoprak lahir sebagai hiburan rakyat di Jawa pada awal abad ke-20 '
           'dan menyebar ke Jawa Timur. Ceritanya diambil dari babad, legenda, '
@@ -179,7 +177,7 @@ abstract final class CultureData {
         AppImages.gamelan,
         AppImages.fasilitasGedung,
       ],
-      videoMinutes: 15,
+      videoMinutes: 0,
     ),
     CultureTopic(
       id: 'gamelan',
@@ -188,7 +186,6 @@ abstract final class CultureData {
       summary: 'Dua laras utama dan perannya dalam pertunjukan.',
       headline: 'Ansambel musik tradisional Jawa dengan dua sistem nada.',
       readMinutes: 7,
-      imageAsset: AppImages.gamelan,
       history:
           'Gamelan adalah ansambel yang terdiri dari gong, kenong, saron, '
           'bonang, kendang, dan instrumen lain. Laras slendro memakai lima nada '
@@ -229,7 +226,7 @@ abstract final class CultureData {
         AppImages.acaraWayang,
         AppImages.fasilitasPendopo,
       ],
-      videoMinutes: 6,
+      videoMinutes: 0,
     ),
     CultureTopic(
       id: 'jaranan-reog',
@@ -238,7 +235,6 @@ abstract final class CultureData {
       summary: 'Tari kuda lumping dan kesenian rakyat Jatim.',
       headline: 'Kesenian rakyat Jawa Timur dengan kuda anyaman dan barongan.',
       readMinutes: 6,
-      imageAsset: AppImages.jaranan,
       history:
           'Jaranan dimainkan penari yang menunggang kuda tiruan dari anyaman '
           'bambu, diiringi kendang, gong, dan terompet. Reog dari Ponorogo '
@@ -284,7 +280,7 @@ abstract final class CultureData {
         AppImages.gamelan,
         AppImages.fasilitasParkir,
       ],
-      videoMinutes: 10,
+      videoMinutes: 0,
     ),
     CultureTopic(
       id: 'arsitektur-joglo',
@@ -293,7 +289,6 @@ abstract final class CultureData {
       summary: 'Filosofi atap Pendopo Agung TKBJ.',
       headline: 'Bangunan tradisional Jawa dengan atap tinggi dan soko guru.',
       readMinutes: 4,
-      imageAsset: AppImages.fasilitasPendopo,
       history:
           'Joglo adalah bangunan tradisional Jawa dengan atap tinggi di bagian '
           'tengah yang ditopang empat tiang utama (soko guru). Pendopo Agung '
@@ -339,7 +334,7 @@ abstract final class CultureData {
         AppImages.fasilitasGedung,
         AppImages.fasilitasParkir,
       ],
-      videoMinutes: 4,
+      videoMinutes: 0,
     ),
   ];
 

@@ -1,9 +1,10 @@
 /*
  * Basis pengetahuan budaya untuk Tanya Krida (alat `materi_budaya`).
  *
- * - Entri yang punya `idMateri` SAMA dengan materi Edukasi Budaya di aplikasi Flutter
- *   (mobile-app/lib/data/dummy/culture_data.dart), sehingga jawaban AI konsisten dengan isi aplikasi dan bisa
- *   diberi tombol "Baca materi". Bila materi di aplikasi diubah, ubah juga di sini.
+ * - Entri yang punya `idMateri` SAMA dengan id materi Edukasi Budaya (tabel `culture_topics`, dikelola admin di
+ *   dashboard → Edukasi). Saat dipakai, isinya ditimpa isi materi terbaru dari database dan tombol "Baca materi"
+ *   hanya muncul bila materinya terpublikasi (lihat cultureEntries() di assistantTools.ts). Materi baru dari
+ *   dashboard otomatis ikut dikenali walau tidak punya entri di sini.
  * - Entri lain adalah ringkasan umum kesenian Jawa Timur. Isinya sengaja ringkas dan hanya memuat fakta yang
  *   umum dikenal; tambahkan/perbaiki bersama pengelola TKBJ bila ada sumber resmi.
  * - Fakta TKBJ di entri 'tkbj' bersumber dari Wikipedia, berita TIMES Indonesia/Radar Malang/ANTARA (2026). Tanggal
@@ -17,7 +18,8 @@ export interface CultureEntry {
   /** Id materi Edukasi Budaya di aplikasi (untuk tombol "Baca materi"), bila ada. */
   idMateri?: string;
   judul: string;
-  kategori: 'Tentang TKBJ' | 'Tari' | 'Teater' | 'Pertunjukan' | 'Musik' | 'Arsitektur';
+  /** Mis. 'Tentang TKBJ', 'Tari', 'Teater', 'Pertunjukan', 'Musik', 'Arsitektur' (materi dashboard: kategori bebas). */
+  kategori: string;
   /** Kata yang dipakai untuk mencocokkan pertanyaan (huruf kecil). */
   kataKunci: string[];
   ringkasan: string;
@@ -250,7 +252,7 @@ export const CULTURE_ENTRIES: CultureEntry[] = [
 const GENERIC_WORDS = new Set(['tari', 'tarian', 'seni', 'kesenian', 'budaya', 'sejarah', 'asal', 'usul', 'makna', 'filosofi', 'tentang', 'jelaskan', 'ceritakan', 'apa', 'itu', 'jawa', 'timur']);
 
 /** Cari entri yang cocok dengan topik (judul atau kata kunci), paling cocok dulu. */
-export function findCulture(topic: string): CultureEntry[] {
+export function findCulture(topic: string, entries: CultureEntry[] = CULTURE_ENTRIES): CultureEntry[] {
   const q = topic.toLowerCase().trim();
   if (!q) return [];
   const words = q.split(/[^a-z0-9-]+/).filter((w) => w.length >= 4 && !GENERIC_WORDS.has(w));
@@ -260,7 +262,7 @@ export function findCulture(topic: string): CultureEntry[] {
     if (e.kataKunci.some((k) => q.includes(k))) return 2;
     return words.some((w) => title.includes(w) || e.kataKunci.some((k) => k.includes(w))) ? 1 : 0;
   };
-  return CULTURE_ENTRIES.map((e) => ({ e, s: score(e) }))
+  return entries.map((e) => ({ e, s: score(e) }))
     .filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s)
     .map((x) => x.e);

@@ -3,6 +3,7 @@ import '../entities/community.dart';
 import '../entities/cultural_event.dart';
 import '../entities/facility.dart';
 import '../entities/gallery_item.dart';
+import '../entities/news_item.dart';
 
 /// Kontrak data publik: acara, fasilitas, komunitas, galeri, dan aturan
 /// aplikasi. Diimplementasikan di layer data (`CatalogRepositoryImpl`).
@@ -12,4 +13,5 @@ abstract interface class CatalogRepository {
   Future<List<Facility>> getFacilities();
   Future<List<Community>> getCommunities();
   Future<List<GalleryItem>> getGallery();
+  Future<List<NewsItem>> getNews();
 }

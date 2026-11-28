@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config/env';
 import { HttpError } from '../lib/http';
 import { findSessionById } from '../models/sessionModel';
-import { findVisitorById } from '../models/visitorModel';
+import { DISABLED_MESSAGE, findVisitorById, visitorStatus } from '../models/visitorModel';
 
 export interface JwtPayload {
   /** ID pengunjung (string, standar klaim JWT). */
@@ -33,6 +33,10 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
   } catch {
     return next(new HttpError(401, 'Sesi berakhir. Silakan masuk kembali.'));
   }
+
+  // Akun dinonaktifkan admin (dashboard → Akun pengunjung): sesinya sudah dicabut, tetapi alasan inilah yang
+  // ditampilkan aplikasi. 401 agar aplikasi keluar dari sesi.
+  if ((await visitorStatus(Number(payload.sub)))?.status === 'Nonaktif') return next(new HttpError(401, DISABLED_MESSAGE));
 
   const session = payload.jti ? await findSessionById(payload.jti) : null;
   if (!session || session.revoked_at || String(session.visitor_id) !== payload.sub) {

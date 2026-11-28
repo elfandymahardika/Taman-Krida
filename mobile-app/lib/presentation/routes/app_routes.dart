@@ -17,6 +17,9 @@ import '../pages/community/community_directory_screen.dart';
 import '../pages/community/community_register_screen.dart';
 import '../pages/education/education_detail_screen.dart';
 import '../pages/education/education_screen.dart';
+import '../pages/education/video_player_screen.dart';
+import '../pages/home/news_detail_screen.dart';
+import '../widgets/common/open_external.dart';
 import '../pages/events/event_calendar_screen.dart';
 import '../pages/events/event_detail_screen.dart';
 import '../pages/gallery/gallery_detail_screen.dart';
@@ -67,6 +70,8 @@ abstract final class AppRoutes {
   static const communityRegister = '/komunitas/daftar';
   static const education = '/edukasi';
   static const educationDetail = '/edukasi/detail';
+  static const videoPlayer = '/edukasi/video';
+  static const newsDetail = '/kabar';
 
   /// Tanya Krida (asisten AI), terbuka tanpa login.
   static const assistant = '/tanya-krida';
@@ -125,6 +130,32 @@ abstract final class AppRoutes {
     } else {
       Navigator.of(context).pushNamed(route, arguments: arguments);
     }
+  }
+
+  /// Tautan dari konten dashboard: "https://…" dibuka di browser, "/…"
+  /// diarahkan ke layar aplikasi yang sepadan (mis. "/agenda" → Kalender).
+  /// Mengembalikan false bila tautan tidak dikenali.
+  static bool openLink(BuildContext context, String link) {
+    if (link.startsWith('https://') || link.startsWith('http://')) {
+      openExternal(context, link);
+      return true;
+    }
+    final first = link.split('?').first.split('/').where((p) => p.isNotEmpty);
+    final route = switch (first.isEmpty ? '' : first.first) {
+      '' => home,
+      'agenda' || 'acara' || 'kalender' => calendar,
+      'tiket' => tickets,
+      'sewa' || 'sewa-gedung' => rental,
+      'galeri' => gallery,
+      'komunitas' => communities,
+      'edukasi' => education,
+      'profil' || 'profil-denah' || 'denah' => profile,
+      'tanya-krida' => assistant,
+      _ => null,
+    };
+    if (route == null) return false;
+    open(context, route);
+    return true;
   }
 
   /// Setelah masuk/daftar: lanjut ke rute tujuan, atau ke tab Akun.
@@ -226,6 +257,8 @@ class AppRouter {
       AppRoutes.educationDetail => EducationDetailScreen(
         args: args! as EducationArgs,
       ),
+      AppRoutes.videoPlayer => VideoPlayerScreen(args: args! as VideoArgs),
+      AppRoutes.newsDetail => NewsDetailScreen(newsId: args! as String),
       AppRoutes.assistant => const AssistantScreen(),
       AppRoutes.account => const AccountScreen(),
       AppRoutes.myTickets => const MyTicketsScreen(),
