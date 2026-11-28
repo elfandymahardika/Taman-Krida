@@ -110,7 +110,3 @@ Panduan lengkap ada di README masing-masing folder:
 - [backend/admin-dashboard/README.md](backend/admin-dashboard/README.md)
 - [backend/mobile-app/README.md](backend/mobile-app/README.md)
 - [frontend/mobile-app/README.md](frontend/mobile-app/README.md)
-
-## Rancangan fitur AI
-
-**Asisten Verifikasi Bukti Pembayaran.** Pengguna mengunggah foto bukti transfer dari aplikasi mobile. AI (OCR / vision model) membaca nominal, pengirim, dan tanggal, mencocokkannya dengan tagihan, lalu memberi saran beserta skor keyakinan kepada admin di dashboard web. Keputusan akhir tetap di tangan admin. Fitur ini belum diimplementasikan; rinciannya ada di README dashboard.
